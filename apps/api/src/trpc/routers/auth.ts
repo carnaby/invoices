@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { users } from '@invoices/db';
-import { loginSchema, registerSchema } from '@invoices/shared';
-import { publicProcedure, router } from '../trpc';
-import { createSession, destroySession, registerUser, verifyCredentials } from '../../auth/auth.service';
+import { changePasswordSchema, loginSchema, registerSchema } from '@invoices/shared';
+import { authedProcedure, publicProcedure, router } from '../trpc';
+import { changeUserPassword, createSession, destroySession, registerUser, verifyCredentials } from '../../auth/auth.service';
 
 export const authRouter = router({
   register: publicProcedure.input(registerSchema).mutation(async ({ ctx, input }) => {
@@ -28,5 +28,8 @@ export const authRouter = router({
       .from(users)
       .where(eq(users.id, ctx.userId));
     return u ?? null;
+  }),
+  changePassword: authedProcedure.input(changePasswordSchema).mutation(async ({ ctx, input }) => {
+    return changeUserPassword(ctx.db, ctx.userId, ctx.getSessionToken(), input);
   }),
 });

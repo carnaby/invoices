@@ -120,6 +120,12 @@ export const sendEmailSchema = z.object({
 });
 export type SendEmailInput = z.infer<typeof sendEmailSchema>;
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Zadajte aktuálne heslo'),
+  newPassword: z.string().min(8, 'Nové heslo musí mať aspoň 8 znakov').max(200),
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 export const signatureUploadSchema = z.object({
   dataBase64: z.string().min(1).max(1_400_000, 'Obrázok môže mať max. 1 MB'),
   mimeType: z.enum(['image/png', 'image/jpeg']),
