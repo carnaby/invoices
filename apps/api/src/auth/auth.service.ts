@@ -49,16 +49,19 @@ export async function changeUserPassword(
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Nesprávne aktuálne heslo' });
   }
   const passwordHash = await argon2.hash(input.newPassword, { type: argon2.argon2id });
-  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
 
-  const currentTokenHash = currentToken ? hashToken(currentToken) : null;
-  await db
-    .delete(sessions)
-    .where(
-      currentTokenHash
-        ? and(eq(sessions.userId, userId), ne(sessions.tokenHash, currentTokenHash))
-        : eq(sessions.userId, userId),
-    );
+    const currentTokenHash = currentToken ? hashToken(currentToken) : null;
+    await tx
+      .delete(sessions)
+      .where(
+        currentTokenHash
+          ? and(eq(sessions.userId, userId), ne(sessions.tokenHash, currentTokenHash))
+          // unreachable in production: userId is always resolved from the session token
+          : eq(sessions.userId, userId),
+      );
+  });
 
   return { ok: true };
 }
