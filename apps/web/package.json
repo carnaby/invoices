@@ -1,0 +1,33 @@
+{
+  "name": "@invoices/web",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "test": "node e2e/ensure-e2e-db.mjs && playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@invoices/shared": "workspace:*",
+    "@tanstack/react-query": "^5.80.0",
+    "@trpc/client": "^11.4.0",
+    "@trpc/react-query": "^11.4.0",
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "superjson": "^2.2.2"
+  },
+  "devDependencies": {
+    "@invoices/api": "workspace:*",
+    "@playwright/test": "^1.53.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "pg": "^8.16.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.3"
+  }
+}
