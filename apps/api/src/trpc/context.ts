@@ -52,15 +52,15 @@ export function createContextFactory(db: Db) {
 
 /** In-memory context for integration tests — captures the cookie instead of HTTP. */
 export function createTestContext(db: Db, userId: string | null = null) {
-  const cookieJar: { token?: string } = {};
-  return {
+  const ctx = {
     db,
     userId,
-    cookieJar,
-    getSessionToken: () => cookieJar.token,
+    cookieJar: {} as { token?: string },
+    getSessionToken: (): string | undefined => ctx.cookieJar.token,
     setSessionCookie: (t: string | null) => {
-      if (t === null) delete cookieJar.token;
-      else cookieJar.token = t;
+      if (t === null) delete ctx.cookieJar.token;
+      else ctx.cookieJar.token = t;
     },
   };
+  return ctx;
 }
