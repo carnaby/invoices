@@ -1,5 +1,14 @@
-export const formatMoney = (n: number, currency = 'EUR') =>
-  new Intl.NumberFormat('sk-SK', { style: 'currency', currency }).format(n);
+export const formatMoney = (n: number, currency = 'EUR') => {
+  try {
+    return new Intl.NumberFormat('sk-SK', { style: 'currency', currency }).format(n);
+  } catch {
+    return (
+      new Intl.NumberFormat('sk-SK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) +
+      ' ' +
+      currency
+    );
+  }
+};
 export const formatDate = (iso: string) => {
   const [y, m, d] = iso.split('-');
   return `${Number(d)}. ${Number(m)}. ${y}`;

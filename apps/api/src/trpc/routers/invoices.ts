@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { invoiceItems, invoices, settings } from '@invoices/db';
 import {
   calcInvoiceTotals, derivePaymentStatus, invoiceInputSchema, isOverdue,
-  markPaidSchema, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
+  markPaidSchema, round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import { invoiceNotFound, loadInvoiceWithItems, todayIso } from '../../invoices/invoices.service';
@@ -135,13 +135,21 @@ export const invoicesRouter = router({
         .from(invoices)
         .where(eq(invoices.userId, ctx.userId));
 
+      const byCurrencyMap = new Map<string, { count: number; total: number; unpaid: number }>();
+      for (const i of list) {
+        const bucket = byCurrencyMap.get(i.currency) ?? { count: 0, total: 0, unpaid: 0 };
+        bucket.count += 1;
+        bucket.total = round2(bucket.total + i.total);
+        bucket.unpaid = round2(bucket.unpaid + Math.max(0, i.total - i.paidAmount));
+        byCurrencyMap.set(i.currency, bucket);
+      }
+      const byCurrency = [...byCurrencyMap.entries()]
+        .sort(([ca, a], [cb, b]) => b.count - a.count || ca.localeCompare(cb))
+        .map(([currency, b]) => ({ currency, total: b.total, unpaid: b.unpaid }));
+
       return {
         invoices: list,
-        summary: {
-          count: list.length,
-          total: Math.round(list.reduce((s, i) => s + i.total, 0) * 100) / 100,
-          unpaid: Math.round(list.reduce((s, i) => s + Math.max(0, i.total - i.paidAmount), 0) * 100) / 100,
-        },
+        summary: { count: list.length, byCurrency },
         years: yearRows.map((r) => r.year),
       };
     }),

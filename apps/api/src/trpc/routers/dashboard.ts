@@ -38,23 +38,39 @@ export const dashboardRouter = router({
       const [yearRows, rows, recentRows] = await Promise.all([yearRowsQ, rowsQ, recentQ]);
 
       const today = todayIso();
-      const monthly = Array(12).fill(0) as number[];
-      let invoicedTotal = 0, paidTotal = 0, unpaidTotal = 0, overdueTotal = 0, overdueCount = 0;
+      type Bucket = {
+        count: number; invoicedTotal: number; paidTotal: number; unpaidTotal: number;
+        overdueTotal: number; overdueCount: number; monthly: number[];
+      };
+      const byCurrencyMap = new Map<string, Bucket>();
       for (const { invoice, total } of rows) {
         const t = Number(total);
-        invoicedTotal = round2(invoicedTotal + t);
+        const bucket = byCurrencyMap.get(invoice.currency) ?? {
+          count: 0, invoicedTotal: 0, paidTotal: 0, unpaidTotal: 0,
+          overdueTotal: 0, overdueCount: 0, monthly: Array(12).fill(0) as number[],
+        };
+        bucket.count += 1;
+        bucket.invoicedTotal = round2(bucket.invoicedTotal + t);
         const month = Number(invoice.issueDate.slice(5, 7)) - 1;
-        monthly[month] = round2(monthly[month] + t);
+        bucket.monthly[month] = round2(bucket.monthly[month] + t);
         const paid = Math.min(invoice.paidAmount, t);
-        paidTotal = round2(paidTotal + paid);
+        bucket.paidTotal = round2(bucket.paidTotal + paid);
         const unpaid = round2(Math.max(0, t - invoice.paidAmount));
-        unpaidTotal = round2(unpaidTotal + unpaid);
+        bucket.unpaidTotal = round2(bucket.unpaidTotal + unpaid);
         const status = derivePaymentStatus(t, invoice.paidAmount);
         if (isOverdue(invoice.dueDate, status, today)) {
-          overdueCount += 1;
-          overdueTotal = round2(overdueTotal + unpaid);
+          bucket.overdueCount += 1;
+          bucket.overdueTotal = round2(bucket.overdueTotal + unpaid);
         }
+        byCurrencyMap.set(invoice.currency, bucket);
       }
+      const byCurrency = [...byCurrencyMap.entries()]
+        .sort(([ca, a], [cb, b]) => b.count - a.count || ca.localeCompare(cb))
+        .map(([currency, b]) => ({
+          currency, invoicedTotal: b.invoicedTotal, paidTotal: b.paidTotal,
+          unpaidTotal: b.unpaidTotal, overdueTotal: b.overdueTotal,
+          overdueCount: b.overdueCount, monthly: b.monthly,
+        }));
 
       const recent = recentRows.map(({ invoice, total }) => {
         const t = Number(total);
@@ -67,6 +83,6 @@ export const dashboardRouter = router({
         };
       });
 
-      return { invoicedTotal, paidTotal, unpaidTotal, overdueTotal, overdueCount, monthly, recent, years: yearRows.map((r) => r.year) };
+      return { byCurrency, recent, years: yearRows.map((r) => r.year) };
     }),
 });

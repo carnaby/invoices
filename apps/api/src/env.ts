@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { config } from 'dotenv';
 
-config({ path: path.resolve(__dirname, '../../../.env') });
+config({ path: path.resolve(__dirname, '../../../.env'), quiet: true });
 
 const isProduction = process.env.NODE_ENV === 'production';
 const appSecret = process.env.APP_SECRET;
