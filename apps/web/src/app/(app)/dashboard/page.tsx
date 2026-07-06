@@ -8,9 +8,20 @@ import { trpc } from '@/lib/trpc';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Máj', 'Jún', 'Júl', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
 
+const ZERO_BUCKET = {
+  currency: 'EUR',
+  invoicedTotal: 0,
+  paidTotal: 0,
+  unpaidTotal: 0,
+  overdueTotal: 0,
+  overdueCount: 0,
+  monthly: Array(12).fill(0) as number[],
+};
+
 export default function DashboardPage() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
+  const [selectedCurrency, setSelectedCurrency] = useState<string | undefined>(undefined);
   const stats = trpc.dashboard.stats.useQuery({ year });
 
   const yearOptions = useMemo(() => {
@@ -19,7 +30,13 @@ export default function DashboardPage() {
     return Array.from(years).sort((a, b) => b - a);
   }, [stats.data?.years, currentYear]);
 
-  const monthly = stats.data?.monthly ?? Array(12).fill(0);
+  const byCurrency = stats.data?.byCurrency ?? [];
+  const currencies = byCurrency.map((b) => b.currency);
+  const activeCurrency =
+    selectedCurrency && currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0];
+  const active = byCurrency.find((b) => b.currency === activeCurrency) ?? ZERO_BUCKET;
+
+  const monthly = active.monthly;
   const maxMonthly = Math.max(...monthly);
 
   return (
@@ -27,17 +44,32 @@ export default function DashboardPage() {
       <PageHeader
         title="Dashboard"
         action={
-          <Select
-            data-testid="year-select"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </Select>
+          <div className="flex items-center gap-3">
+            <Select
+              data-testid="year-select"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </Select>
+            {currencies.length > 1 && (
+              <Select
+                data-testid="currency-select"
+                value={activeCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value)}
+              >
+                {currencies.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
         }
       />
 
@@ -45,23 +77,23 @@ export default function DashboardPage() {
         <StatTile
           data-testid="stat-invoiced"
           label="Fakturované"
-          value={formatMoney(stats.data?.invoicedTotal ?? 0)}
+          value={formatMoney(active.invoicedTotal, active.currency)}
         />
         <StatTile
           data-testid="stat-paid"
           label="Uhradené"
-          value={formatMoney(stats.data?.paidTotal ?? 0)}
+          value={formatMoney(active.paidTotal, active.currency)}
           tone="success"
         />
         <StatTile
           data-testid="stat-unpaid"
           label="Neuhradené"
-          value={formatMoney(stats.data?.unpaidTotal ?? 0)}
+          value={formatMoney(active.unpaidTotal, active.currency)}
         />
         <StatTile
           data-testid="stat-overdue"
-          label={`Po splatnosti (${stats.data?.overdueCount ?? 0})`}
-          value={formatMoney(stats.data?.overdueTotal ?? 0)}
+          label={`Po splatnosti (${active.overdueCount})`}
+          value={formatMoney(active.overdueTotal, active.currency)}
           tone="danger"
         />
       </div>
@@ -75,7 +107,7 @@ export default function DashboardPage() {
               <div key={i} className="flex flex-1 flex-col items-center gap-2">
                 <div className="flex h-32 w-full items-end">
                   <div
-                    title={formatMoney(amount)}
+                    title={formatMoney(amount, active.currency)}
                     className="w-full rounded-t-md bg-[#0071e3] transition-all"
                     style={{ height: `${h}%` }}
                   />
