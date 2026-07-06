@@ -357,6 +357,11 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
               onChange={handleFile}
               className="block text-sm text-[#1d1d1f] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0071e3] file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white file:transition hover:file:bg-[#0077ed]"
             />
+            {uploadSignature.isError && (
+              <p data-testid="signature-error" className="mt-2 text-sm text-[#ff3b30]">
+                {uploadSignature.error.message || 'Nahranie podpisu zlyhalo'}
+              </p>
+            )}
             {live.hasSignature && (
               <Button
                 type="button"
