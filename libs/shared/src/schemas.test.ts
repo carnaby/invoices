@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  contactInputSchema, invoiceInputSchema, registerSchema, sendEmailSchema,
+  changePasswordSchema, contactInputSchema, invoiceInputSchema, registerSchema, sendEmailSchema,
 } from './schemas';
 
 describe('registerSchema', () => {
@@ -49,6 +49,24 @@ describe('sendEmailSchema', () => {
   it('requires uuid id, subject, body', () => {
     expect(
       sendEmailSchema.safeParse({ id: 'not-uuid', subject: 'x', body: 'y' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('changePasswordSchema', () => {
+  it('accepts valid current + new password', () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: 'old-password', newPassword: 'new-password123' }).success,
+    ).toBe(true);
+  });
+  it('rejects short newPassword', () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: 'old-password', newPassword: 'short' }).success,
+    ).toBe(false);
+  });
+  it('rejects empty currentPassword', () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: '', newPassword: 'new-password123' }).success,
     ).toBe(false);
   });
 });
