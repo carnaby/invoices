@@ -15,7 +15,11 @@ async function bootstrap() {
   await runMigrations(env.databaseUrl);
   const db = createDb(env.databaseUrl);
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Disable Nest's default body parser (100kb JSON limit) so we can register
+  // one with a higher limit — the signature upload endpoint sends base64
+  // image payloads that can exceed the default well before 1 MB.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  app.useBodyParser('json', { limit: '2mb' });
   app.use(cookieParser());
   app.enableCors({ origin: env.webOrigin, credentials: true });
   app.use(
