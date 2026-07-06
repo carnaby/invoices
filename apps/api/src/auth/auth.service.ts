@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import argon2 from 'argon2';
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { sessions, settings, users, type Db } from '@invoices/db';
-import type { LoginInput, RegisterInput } from '@invoices/shared';
+import type { ChangePasswordInput, LoginInput, RegisterInput } from '@invoices/shared';
 import { hashToken, SESSION_TTL_DAYS } from '../trpc/context';
 
 export async function registerUser(db: Db, input: RegisterInput) {
@@ -35,4 +35,33 @@ export async function createSession(db: Db, userId: string): Promise<string> {
 
 export async function destroySession(db: Db, token: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.tokenHash, hashToken(token)));
+}
+
+export async function changeUserPassword(
+  db: Db,
+  userId: string,
+  currentToken: string | undefined,
+  input: ChangePasswordInput,
+): Promise<{ ok: true }> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  const ok = user ? await argon2.verify(user.passwordHash, input.currentPassword) : false;
+  if (!ok) {
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Nesprávne aktuálne heslo' });
+  }
+  const passwordHash = await argon2.hash(input.newPassword, { type: argon2.argon2id });
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
+
+    const currentTokenHash = currentToken ? hashToken(currentToken) : null;
+    await tx
+      .delete(sessions)
+      .where(
+        currentTokenHash
+          ? and(eq(sessions.userId, userId), ne(sessions.tokenHash, currentTokenHash))
+          // unreachable in production: userId is always resolved from the session token
+          : eq(sessions.userId, userId),
+      );
+  });
+
+  return { ok: true };
 }

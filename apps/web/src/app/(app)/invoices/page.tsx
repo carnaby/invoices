@@ -41,8 +41,16 @@ export default function InvoicesPage() {
   });
 
   const invoices = list.data?.invoices ?? [];
-  const summary = list.data?.summary ?? { count: 0, total: 0, unpaid: 0 };
+  const summary = list.data?.summary ?? { count: 0, byCurrency: [] as { currency: string; total: number; unpaid: number }[] };
   const years = [...(list.data?.years ?? [])].sort((a, b) => b - a);
+
+  const totalValue = summary.byCurrency.length
+    ? summary.byCurrency.map((b) => formatMoney(b.total, b.currency)).join(' · ')
+    : formatMoney(0);
+  const unpaidValue = summary.byCurrency.length
+    ? summary.byCurrency.map((b) => formatMoney(b.unpaid, b.currency)).join(' · ')
+    : formatMoney(0);
+  const hasUnpaid = summary.byCurrency.some((b) => b.unpaid > 0);
 
   return (
     <div>
@@ -100,12 +108,12 @@ export default function InvoicesPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
         <StatTile data-testid="summary-count" label="Počet faktúr" value={invoiceCountLabel(summary.count)} />
-        <StatTile data-testid="summary-total" label="Spolu" value={formatMoney(summary.total)} />
+        <StatTile data-testid="summary-total" label="Spolu" value={totalValue} />
         <StatTile
           data-testid="summary-unpaid"
           label="Neuhradené"
-          value={formatMoney(summary.unpaid)}
-          tone={summary.unpaid > 0 ? 'danger' : 'default'}
+          value={unpaidValue}
+          tone={hasUnpaid ? 'danger' : 'default'}
         />
       </div>
 

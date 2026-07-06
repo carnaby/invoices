@@ -95,12 +95,37 @@ describe('invoices', () => {
     expect(all2026.invoices).toHaveLength(3);
     expect(all2026.invoices[0].number).toBe('20260003'); // desc order
     expect(all2026.years.sort()).toEqual([2025, 2026]);
-    expect(all2026.summary).toMatchObject({ count: 3, total: 680, unpaid: 390 });
+    expect(all2026.summary).toMatchObject({
+      count: 3,
+      byCurrency: [{ currency: 'EUR', total: 680, unpaid: 390 }],
+    });
 
     expect((await caller.invoices.list({ year: 2026, status: 'paid' })).invoices.map((i) => i.number)).toEqual(['20260003']);
     expect((await caller.invoices.list({ year: 2026, status: 'overdue' })).invoices.map((i) => i.number)).toEqual(['20260001']);
     expect((await caller.invoices.list({ search: 'iná fir' })).invoices).toHaveLength(1);
     expect((await caller.invoices.list({ search: '2025' })).invoices).toHaveLength(1);
+  });
+
+  it('list summary.byCurrency keeps currencies separate, ordered by count desc then currency asc', async () => {
+    const caller = await newUserCaller('jozef');
+    await caller.invoices.create(baseInvoice); // EUR, total 290
+    await caller.invoices.create({
+      ...baseInvoice, number: '20260002', currency: 'CZK',
+      items: [{ description: 'X', quantity: 1, unitPrice: 1000, vatRate: 0 }],
+    }); // CZK, total 1000
+    const { id: paidId } = await caller.invoices.create({
+      ...baseInvoice, number: '20260003', currency: 'CZK',
+      items: [{ description: 'Y', quantity: 1, unitPrice: 500, vatRate: 0 }],
+    });
+    await caller.invoices.markPaid({ id: paidId, paidAmount: 200, paidDate: '2026-02-01' });
+
+    const { summary } = await caller.invoices.list({});
+    expect(summary.count).toBe(3);
+    // CZK has 2 invoices, EUR has 1 → CZK first
+    expect(summary.byCurrency).toEqual([
+      { currency: 'CZK', total: 1500, unpaid: 1300 },
+      { currency: 'EUR', total: 290, unpaid: 290 },
+    ]);
   });
 
   it('remove deletes invoice with items', async () => {

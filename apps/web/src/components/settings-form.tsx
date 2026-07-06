@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { SettingsInput } from '@invoices/shared';
+import { changePasswordSchema } from '@invoices/shared';
 import { Button, Card, Field, Input, Textarea } from '@/components/ui';
 import { apiUrl, trpc } from '@/lib/trpc';
 
@@ -96,6 +97,76 @@ function SavedIndicator({ show }: { show: boolean }) {
   );
 }
 
+function AccountCard() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [changed, setChanged] = useState(false);
+
+  const changePassword = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      setCurrentPassword('');
+      setNewPassword('');
+      setChanged(true);
+    },
+  });
+
+  function handleSubmit() {
+    setChanged(false);
+    const result = changePasswordSchema.safeParse({ currentPassword, newPassword });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const key = String(issue.path[0] ?? '');
+        if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
+      setErrors(fieldErrors);
+      return;
+    }
+    setErrors({});
+    changePassword.mutate(result.data);
+  }
+
+  return (
+    <Card>
+      <h2 className="mb-6 text-lg font-semibold tracking-tight">Účet</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Aktuálne heslo" error={errors.currentPassword}>
+          <Input
+            data-testid="currentPassword"
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+        </Field>
+        <Field label="Nové heslo" error={errors.newPassword}>
+          <Input
+            data-testid="newPassword"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </Field>
+      </div>
+      <div className="mt-6 flex items-center justify-end gap-3">
+        {changed && (
+          <span data-testid="password-changed" className="text-sm font-medium text-[#34c759]">
+            Heslo bolo zmenené
+          </span>
+        )}
+        {changePassword.isError && (
+          <span data-testid="password-error" className="text-sm text-[#ff3b30]">
+            {changePassword.error.message}
+          </span>
+        )}
+        <Button data-testid="save-password" disabled={changePassword.isPending} onClick={handleSubmit}>
+          Zmeniť heslo
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 export function SettingsForm({ initial }: { initial: SettingsData }) {
   const utils = trpc.useUtils();
   const live = trpc.settings.get.useQuery().data ?? initial;
@@ -162,6 +233,8 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
 
   return (
     <div className="max-w-3xl space-y-6">
+      <AccountCard />
+
       <Card>
         <h2 className="mb-6 text-lg font-semibold tracking-tight">Dodávateľ</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

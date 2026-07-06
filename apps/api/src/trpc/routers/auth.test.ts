@@ -3,6 +3,7 @@ import { createTestDb, truncateAll } from '@invoices/db/src/testing';
 import { settings, users } from '@invoices/db';
 import { createTestContext, resolveUserId } from '../context';
 import { createCaller } from '../app-router';
+import { createSession, verifyCredentials } from '../../auth/auth.service';
 import type { Db } from '@invoices/db';
 
 let db: Db; let close: () => Promise<void>;
@@ -59,5 +60,49 @@ describe('auth', () => {
     await expect(resolveUserId(db, token)).resolves.toBeNull();
     const anonCaller = createCaller(createTestContext(db));
     await expect(anonCaller.auth.me()).resolves.toBeNull();
+  });
+});
+
+describe('auth.changePassword', () => {
+  async function registerAndAuthCaller() {
+    const regCtx = createTestContext(db);
+    await createCaller(regCtx).auth.register({ username: 'jozef', password: 'password123' });
+    const token = regCtx.cookieJar.token!;
+    const userId = await resolveUserId(db, token);
+    const ctx = Object.assign(createTestContext(db, userId), { cookieJar: { token } });
+    return { ctx, caller: createCaller(ctx), token };
+  }
+
+  it('happy path: changes password, old fails and new works via verifyCredentials', async () => {
+    const { caller } = await registerAndAuthCaller();
+    await expect(
+      caller.auth.changePassword({ currentPassword: 'password123', newPassword: 'newpassword456' }),
+    ).resolves.toEqual({ ok: true });
+
+    await expect(verifyCredentials(db, { username: 'jozef', password: 'newpassword456' })).resolves.toMatchObject({
+      username: 'jozef',
+    });
+    await expect(
+      verifyCredentials(db, { username: 'jozef', password: 'password123' }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it('rejects wrong currentPassword with exact Slovak UNAUTHORIZED message', async () => {
+    const { caller } = await registerAndAuthCaller();
+    await expect(
+      caller.auth.changePassword({ currentPassword: 'wrong-password', newPassword: 'newpassword456' }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED', message: 'Nesprávne aktuálne heslo' });
+  });
+
+  it('invalidates all other sessions but keeps the current one', async () => {
+    const { ctx, caller, token: tokenA } = await registerAndAuthCaller();
+    const tokenB = await createSession(db, ctx.userId!);
+
+    await expect(
+      caller.auth.changePassword({ currentPassword: 'password123', newPassword: 'newpassword456' }),
+    ).resolves.toEqual({ ok: true });
+
+    await expect(resolveUserId(db, tokenA)).resolves.toBe(ctx.userId);
+    await expect(resolveUserId(db, tokenB)).resolves.toBeNull();
   });
 });
