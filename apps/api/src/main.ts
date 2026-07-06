@@ -33,4 +33,7 @@ async function bootstrap() {
   await app.listen(env.apiPort);
   console.log(`API listening on http://localhost:${env.apiPort}`);
 }
-bootstrap();
+bootstrap().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
