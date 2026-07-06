@@ -1,13 +1,16 @@
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { invoiceItems, invoices } from '@invoices/db';
+import { invoiceItems, invoices, settings } from '@invoices/db';
 import {
   calcInvoiceTotals, derivePaymentStatus, invoiceInputSchema, isOverdue,
-  markPaidSchema, suggestInvoiceNumber, type InvoiceInput,
+  markPaidSchema, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import { invoiceNotFound, loadInvoiceWithItems, todayIso } from '../../invoices/invoices.service';
+import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
+import { generateInvoicePdf } from '../../pdf/pdf.service';
+import { env } from '../../env';
 
 const idInput = z.object({ id: z.string().uuid() });
 
@@ -164,5 +167,26 @@ export const invoicesRouter = router({
       .returning({ id: invoices.id });
     if (!updated) throw invoiceNotFound();
     return { id: updated.id };
+  }),
+
+  sendEmail: authedProcedure.input(sendEmailSchema).mutation(async ({ ctx, input }) => {
+    const { invoice } = await loadInvoiceWithItems(ctx.db, ctx.userId, input.id);
+    const [row] = await ctx.db.select().from(settings).where(eq(settings.userId, ctx.userId));
+    const cfg = smtpConfigFromSettings(row, env.appSecret);
+    if (!invoice.customerEmail) {
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Odberateľ nemá vyplnený e-mail' });
+    }
+    const pdf = await generateInvoicePdf(ctx.db, ctx.userId, input.id);
+    await sendMail(cfg, {
+      to: [invoice.customerEmail],
+      cc: invoice.customerCcEmails.length ? invoice.customerCcEmails : undefined,
+      subject: input.subject,
+      text: input.body,
+      attachments: [{ filename: `faktura-${invoice.number}.pdf`, content: pdf }],
+    });
+    const sentAt = new Date();
+    await ctx.db.update(invoices).set({ sentAt, updatedAt: sentAt })
+      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
+    return { sentAt: sentAt.toISOString() };
   }),
 });
