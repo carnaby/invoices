@@ -1,0 +1,16 @@
+{
+  "name": "invoices",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "nx run-many -t test",
+    "build": "nx run-many -t build",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "nx": "^21.3.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3"
+  }
+}
