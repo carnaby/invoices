@@ -46,7 +46,10 @@ const parseNum = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const emptyToUndefined = (v: string) => (v.trim() === '' ? undefined : v);
+// Cleared optional fields must serialize to `null`, not `undefined`: drizzle's
+// `.set()` skips `undefined` columns entirely, so an `undefined` value would
+// silently leave the previous saved value in place instead of clearing it.
+const emptyToNull = (v: string) => (v.trim() === '' ? null : v);
 
 function toFormState(initial?: InvoiceInput): FormState {
   const today = todayIso();
@@ -88,16 +91,16 @@ function toRawInput(state: FormState) {
   return {
     contactId: state.contactId,
     number: state.number,
-    variableSymbol: emptyToUndefined(state.variableSymbol),
-    constantSymbol: emptyToUndefined(state.constantSymbol),
+    variableSymbol: emptyToNull(state.variableSymbol),
+    constantSymbol: emptyToNull(state.constantSymbol),
     customerName: state.customerName,
-    customerIco: emptyToUndefined(state.customerIco),
-    customerIcDph: emptyToUndefined(state.customerIcDph),
-    customerDic: emptyToUndefined(state.customerDic),
-    customerStreet: emptyToUndefined(state.customerStreet),
-    customerZip: emptyToUndefined(state.customerZip),
-    customerCity: emptyToUndefined(state.customerCity),
-    customerCountry: emptyToUndefined(state.customerCountry),
+    customerIco: emptyToNull(state.customerIco),
+    customerIcDph: emptyToNull(state.customerIcDph),
+    customerDic: emptyToNull(state.customerDic),
+    customerStreet: emptyToNull(state.customerStreet),
+    customerZip: emptyToNull(state.customerZip),
+    customerCity: emptyToNull(state.customerCity),
+    customerCountry: emptyToNull(state.customerCountry),
     customerEmail: state.customerEmail,
     customerCcEmails: state.customerCcEmails
       .split(',')
@@ -106,8 +109,8 @@ function toRawInput(state: FormState) {
     issueDate: state.issueDate,
     dueDate: state.dueDate,
     deliveryDate: state.deliveryDate,
-    introText: emptyToUndefined(state.introText),
-    note: emptyToUndefined(state.note),
+    introText: emptyToNull(state.introText),
+    note: emptyToNull(state.note),
     currency: state.currency,
     items: state.items.map((item) => ({
       description: item.description,
