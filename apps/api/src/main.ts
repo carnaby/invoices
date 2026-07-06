@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 import { env } from './env';
 import { appRouter } from './trpc/app-router';
 import { createContextFactory } from './trpc/context';
+import { createFilesRouter } from './rest/files';
 
 async function bootstrap() {
   await runMigrations(env.databaseUrl);
@@ -24,6 +25,7 @@ async function bootstrap() {
       createContext: createContextFactory(db),
     }),
   );
+  app.use('/files', createFilesRouter(db));
   await app.listen(env.apiPort);
   console.log(`API listening on http://localhost:${env.apiPort}`);
 }
