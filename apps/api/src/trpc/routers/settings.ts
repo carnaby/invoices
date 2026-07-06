@@ -3,6 +3,7 @@ import { settings, type Db } from '@invoices/db';
 import { settingsInputSchema, signatureUploadSchema, smtpPasswordSchema } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import { encryptSecret } from '../../crypto/crypto.service';
+import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
 import { env } from '../../env';
 
 async function readSettings(db: Db, userId: string) {
@@ -47,6 +48,13 @@ export const settingsRouter = router({
       .update(settings)
       .set({ signatureImage: null, signatureMimeType: null, updatedAt: new Date() })
       .where(eq(settings.userId, ctx.userId));
+    return { ok: true };
+  }),
+  testSmtp: authedProcedure.mutation(async ({ ctx }) => {
+    const [row] = await ctx.db.select().from(settings).where(eq(settings.userId, ctx.userId));
+    const cfg = smtpConfigFromSettings(row, env.appSecret);
+    await sendMail(cfg, { to: [cfg.from], subject: 'Test SMTP — Faktúry',
+      text: 'Toto je testovacia správa. SMTP funguje.' });
     return { ok: true };
   }),
 });
