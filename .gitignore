@@ -1,2 +1,15 @@
 /idoklad
 /docs
+node_modules/
+dist/
+.next/
+.nx/
+coverage/
+playwright-report/
+test-results/
+backups/
+.env
+.env.*
+!.env.example
+!docker/.env.prod.example
+*.tsbuildinfo
