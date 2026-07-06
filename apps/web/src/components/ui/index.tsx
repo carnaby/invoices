@@ -208,12 +208,28 @@ export function Tr({
   );
 }
 
-export function Th({ className, children }: { className?: string; children: ReactNode }) {
-  return <th className={cn('py-3 pr-4 font-medium', className)}>{children}</th>;
+export function Th({
+  className,
+  children,
+  ...rest
+}: { className?: string; children: ReactNode } & WithTestId) {
+  return (
+    <th className={cn('py-3 pr-4 font-medium', className)} {...rest}>
+      {children}
+    </th>
+  );
 }
 
-export function Td({ className, children }: { className?: string; children: ReactNode }) {
-  return <td className={cn('py-3.5 pr-4 text-[#1d1d1f]', className)}>{children}</td>;
+export function Td({
+  className,
+  children,
+  ...rest
+}: { className?: string; children: ReactNode } & WithTestId) {
+  return (
+    <td className={cn('py-3.5 pr-4 text-[#1d1d1f]', className)} {...rest}>
+      {children}
+    </td>
+  );
 }
 
 export function ConfirmDialog({
