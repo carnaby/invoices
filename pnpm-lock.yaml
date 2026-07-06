@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  lzma1@0.2.0:
+    hash: 0d229aa072cd937d3d60bff6c9713a265d8cb0c15acaa414242898b6345cbe0d
+    path: patches/lzma1@0.2.0.patch
+
 importers:
 
   .:
@@ -3298,7 +3303,7 @@ snapshots:
 
   bysquare@2.13.3:
     dependencies:
-      lzma1: 0.2.0
+      lzma1: 0.2.0(patch_hash=0d229aa072cd937d3d60bff6c9713a265d8cb0c15acaa414242898b6345cbe0d)
       validator: 13.15.35
 
   bytes@3.1.2: {}
@@ -3903,7 +3908,7 @@ snapshots:
 
   lru-cache@7.18.3: {}
 
-  lzma1@0.2.0: {}
+  lzma1@0.2.0(patch_hash=0d229aa072cd937d3d60bff6c9713a265d8cb0c15acaa414242898b6345cbe0d): {}
 
   magic-string@0.30.21:
     dependencies:
