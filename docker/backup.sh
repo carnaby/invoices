@@ -5,5 +5,5 @@ cd "$(dirname "$0")"
 COMPOSE_FILE="${1:-docker-compose.prod.yml}"
 mkdir -p ../backups
 STAMP=$(date +%Y%m%d-%H%M%S)
-docker compose -f "$COMPOSE_FILE" exec -T db pg_dump -U invoices invoices | gzip > "../backups/invoices-$STAMP.sql.gz"
+docker compose -f "$COMPOSE_FILE" exec -T db pg_dump --clean --if-exists -U invoices invoices | gzip > "../backups/invoices-$STAMP.sql.gz"
 echo "OK: backups/invoices-$STAMP.sql.gz"
