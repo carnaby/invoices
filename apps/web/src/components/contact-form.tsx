@@ -47,30 +47,33 @@ function toFormState(initial?: ContactInput & { id?: string }): FormState {
   };
 }
 
-const emptyToUndefined = (v: string) => (v.trim() === '' ? undefined : v);
+// Cleared optional fields must serialize to `null`, not `undefined`: drizzle's
+// `.set()` skips `undefined` columns entirely, so an `undefined` value would
+// silently leave the previous saved value in place instead of clearing it.
+const emptyToNull = (v: string) => (v.trim() === '' ? null : v);
 
 function toRawInput(state: FormState) {
   return {
     companyName: state.companyName,
-    ico: emptyToUndefined(state.ico),
-    icDph: emptyToUndefined(state.icDph),
-    dic: emptyToUndefined(state.dic),
-    street: emptyToUndefined(state.street),
-    zip: emptyToUndefined(state.zip),
-    city: emptyToUndefined(state.city),
+    ico: emptyToNull(state.ico),
+    icDph: emptyToNull(state.icDph),
+    dic: emptyToNull(state.dic),
+    street: emptyToNull(state.street),
+    zip: emptyToNull(state.zip),
+    city: emptyToNull(state.city),
     country: state.country,
     email: state.email,
     ccEmails: state.ccEmails
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    phone: emptyToUndefined(state.phone),
-    contactFirstName: emptyToUndefined(state.contactFirstName),
-    contactLastName: emptyToUndefined(state.contactLastName),
+    phone: emptyToNull(state.phone),
+    contactFirstName: emptyToNull(state.contactFirstName),
+    contactLastName: emptyToNull(state.contactLastName),
     defaultDueDays: state.defaultDueDays.trim() === '' ? null : Number(state.defaultDueDays),
     discountPercent: state.discountPercent.trim() === '' ? undefined : Number(state.discountPercent),
-    iban: emptyToUndefined(state.iban),
-    swift: emptyToUndefined(state.swift),
+    iban: emptyToNull(state.iban),
+    swift: emptyToNull(state.swift),
   };
 }
 

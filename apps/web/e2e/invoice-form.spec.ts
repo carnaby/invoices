@@ -9,6 +9,7 @@ test('create invoice with two items, live totals, then edit', async ({ page }) =
   await expect(page.getByTestId('number')).toHaveValue(`${y}0001`); // suggested
 
   await page.getByTestId('customerName').fill('Test s.r.o.');
+  await page.getByTestId('customerIco').fill('123');
   await page.getByTestId('item-desc-0').fill('Programátorské práce');
   await page.getByTestId('item-qty-0').fill('2');
   await page.getByTestId('item-price-0').fill('100');
@@ -26,8 +27,15 @@ test('create invoice with two items, live totals, then edit', async ({ page }) =
   await page.getByTestId('edit-invoice').click();
   await page.getByTestId('item-remove-1').click();
   await expect(page.getByTestId('totals-total')).toContainText('240,00');
+  await expect(page.getByTestId('customerIco')).toHaveValue('123');
+  await page.getByTestId('customerIco').fill('');
   await page.getByTestId('save').click();
   await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
+
+  // Regression: clearing an optional field must persist as cleared, not silently
+  // keep the previous saved value (drizzle's update skips `undefined` columns).
+  await page.getByTestId('edit-invoice').click();
+  await expect(page.getByTestId('customerIco')).toHaveValue('');
 });
 
 test('contact selection prefills customer snapshot', async ({ page }) => {
