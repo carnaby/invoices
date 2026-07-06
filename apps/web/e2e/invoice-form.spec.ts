@@ -18,6 +18,7 @@ test('create invoice with two items, live totals, then edit', async ({ page }) =
   await page.getByTestId('item-qty-1').fill('1');
   await page.getByTestId('item-price-1').fill('50,50');
   await expect(page.getByTestId('totals-total')).toContainText('290,50');
+  await expect(page.getByTestId('item-total-0')).toContainText('240,00');
 
   await page.getByTestId('save').click();
   await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
