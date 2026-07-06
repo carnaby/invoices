@@ -1,6 +1,7 @@
 import puppeteer, { type Browser } from 'puppeteer';
 import { eq } from 'drizzle-orm';
 import { settings, type Db } from '@invoices/db';
+import { round2 } from '@invoices/shared';
 import { loadInvoiceWithItems } from '../invoices/invoices.service';
 import { buildPayBySquareText, buildQrDataUrl } from './qr';
 import { renderInvoiceHtml } from './invoice-template';
@@ -26,7 +27,7 @@ export async function generateInvoicePdf(db: Db, userId: string, invoiceId: stri
   const [userSettings] = await db.select().from(settings).where(eq(settings.userId, userId));
 
   let qrDataUrl: string | null = null;
-  const remaining = Math.max(0, totals.total - invoice.paidAmount);
+  const remaining = round2(Math.max(0, totals.total - invoice.paidAmount));
   if (userSettings?.iban && remaining > 0) {
     qrDataUrl = await buildQrDataUrl(
       buildPayBySquareText({
