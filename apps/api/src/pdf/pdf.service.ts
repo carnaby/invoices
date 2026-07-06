@@ -26,12 +26,12 @@ export async function generateInvoicePdf(db: Db, userId: string, invoiceId: stri
   const [userSettings] = await db.select().from(settings).where(eq(settings.userId, userId));
 
   let qrDataUrl: string | null = null;
-  if (userSettings?.iban) {
-    const remaining = Math.max(0, totals.total - invoice.paidAmount);
+  const remaining = Math.max(0, totals.total - invoice.paidAmount);
+  if (userSettings?.iban && remaining > 0) {
     qrDataUrl = await buildQrDataUrl(
       buildPayBySquareText({
         iban: userSettings.iban,
-        amount: remaining > 0 ? remaining : totals.total,
+        amount: remaining,
         currency: invoice.currency,
         variableSymbol: invoice.variableSymbol,
         constantSymbol: invoice.constantSymbol,
