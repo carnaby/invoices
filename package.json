@@ -6,7 +6,7 @@
     "dev": "pnpm db:up && pnpm --parallel --filter @invoices/api --filter @invoices/web dev",
     "test": "nx run-many -t test",
     "build": "nx run-many -t build",
-    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d --wait",
     "db:down": "docker compose -f docker/docker-compose.yml down",
     "idoklad:fetch": "tsx tools/idoklad/fetch.ts"
   },
