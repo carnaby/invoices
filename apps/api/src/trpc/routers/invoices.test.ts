@@ -76,6 +76,26 @@ describe('invoices', () => {
     expect(invoice.paidDate).toBe(todayIso());
   });
 
+  it('addPayment adds partial payments to the paid amount and keeps the latest date', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await caller.invoices.addPayment({ id, amount: 100.1, paidDate: '2026-02-01' });
+    await caller.invoices.addPayment({ id, amount: 189.9, paidDate: '2026-03-15' });
+    const { invoice } = await caller.invoices.get({ id });
+    expect(invoice.paidAmount).toBe(290);
+    expect(invoice.paidDate).toBe('2026-03-15');
+  });
+
+  it('addPayment defaults paidDate to today and rejects non-positive amounts', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await caller.invoices.addPayment({ id, amount: 50 });
+    expect((await caller.invoices.get({ id })).invoice.paidDate).toBe(todayIso());
+    await expect(caller.invoices.addPayment({ id, amount: 0 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.invoices.addPayment({ id, amount: -10 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(50);
+  });
+
   it('list filters by year, status, search and returns summary + years', async () => {
     const caller = await newUserCaller('jozef');
     await caller.invoices.create(baseInvoice); // 2026, unpaid, past due → overdue (total 290)
@@ -142,6 +162,8 @@ describe('invoices', () => {
     await expect(b.invoices.get({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(b.invoices.update({ id, data: baseInvoice })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(b.invoices.markPaid({ id, paidAmount: 1 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(b.invoices.addPayment({ id, amount: 1 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await a.invoices.get({ id })).invoice.paidAmount).toBe(0);
     await expect(b.invoices.remove({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

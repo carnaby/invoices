@@ -46,3 +46,27 @@ test('send email without smtp shows Slovak error', async ({ page }) => {
   await page.getByTestId('email-send').click();
   await expect(page.getByTestId('email-error')).toContainText('SMTP nie je nakonfigurované');
 });
+
+test('partial payments add up and the second one prefills the remaining amount', async ({ page }) => {
+  await registerAndLogin(page);
+  await page.goto('/invoices/new');
+  await page.getByTestId('customerName').fill('Splátky s.r.o.');
+  await page.getByTestId('item-desc-0').fill('Práce');
+  await page.getByTestId('item-qty-0').fill('1');
+  await page.getByTestId('item-price-0').fill('120');
+  await page.getByTestId('save').click();
+  await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
+
+  await page.getByTestId('mark-paid').click();
+  await expect(page.getByTestId('paid-amount')).toHaveValue('120');
+  await page.getByTestId('paid-amount').fill('50');
+  await page.getByTestId('confirm').click();
+  await expect(page.getByTestId('paid-info')).toContainText('50,00');
+  await expect(page.getByTestId('paid-info')).toContainText('120,00');
+
+  await page.getByTestId('mark-paid').click();
+  await expect(page.getByTestId('already-paid')).toContainText('50,00');
+  await expect(page.getByTestId('paid-amount')).toHaveValue('70');
+  await page.getByTestId('confirm').click();
+  await expect(page.getByText('Uhradená', { exact: true })).toBeVisible();
+});

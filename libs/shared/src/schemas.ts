@@ -113,6 +113,14 @@ export const markPaidSchema = z.object({
 });
 export type MarkPaidInput = z.infer<typeof markPaidSchema>;
 
+/** One received payment; it is added to what the invoice already has paid. */
+export const addPaymentSchema = z.object({
+  id: z.string().uuid(),
+  amount: z.number().positive().max(1e10),
+  paidDate: dateStr.optional().nullable(),
+});
+export type AddPaymentInput = z.infer<typeof addPaymentSchema>;
+
 export const sendEmailSchema = z.object({
   id: z.string().uuid(),
   subject: z.string().trim().min(1, 'Predmet je povinný').max(200),

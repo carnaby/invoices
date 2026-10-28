@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { invoiceItems, invoices, settings } from '@invoices/db';
 import {
-  calcInvoiceTotals, derivePaymentStatus, invoiceInputSchema, isOverdue,
+  addPaymentSchema, calcInvoiceTotals, derivePaymentStatus, invoiceInputSchema, isOverdue,
   markPaidSchema, round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
@@ -169,6 +169,21 @@ export const invoicesRouter = router({
       .set({
         paidAmount: input.paidAmount,
         paidDate: input.paidDate ?? (input.paidAmount > 0 ? todayIso() : null),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
+      .returning({ id: invoices.id });
+    if (!updated) throw invoiceNotFound();
+    return { id: updated.id };
+  }),
+
+  // Adds in SQL so two payments recorded at once cannot overwrite each other.
+  addPayment: authedProcedure.input(addPaymentSchema).mutation(async ({ ctx, input }) => {
+    const [updated] = await ctx.db
+      .update(invoices)
+      .set({
+        paidAmount: sql`${invoices.paidAmount} + ${round2(input.amount)}`,
+        paidDate: input.paidDate ?? todayIso(),
         updatedAt: new Date(),
       })
       .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))

@@ -239,6 +239,7 @@ export default function InvoiceDetailPage() {
           invoiceId={id}
           total={totals.total}
           paidAmount={invoice.paidAmount}
+          currency={invoice.currency}
           onClose={() => setDialog('none')}
         />
       )}
