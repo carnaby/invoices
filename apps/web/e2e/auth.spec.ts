@@ -26,3 +26,12 @@ test('unauthenticated visit to /dashboard redirects to /login', async ({ page })
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login/);
 });
+
+test('unreachable API shows an error instead of a blank page', async ({ page }) => {
+  await page.route((url) => url.pathname.startsWith('/trpc/') && url.pathname.includes('auth.me'), (route) =>
+    route.abort('connectionrefused'),
+  );
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('api-error')).toContainText('Server nie je dostupný');
+  await expect(page.getByTestId('api-retry')).toBeVisible();
+});

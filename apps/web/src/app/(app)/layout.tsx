@@ -24,6 +24,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (me.isSuccess && !me.isFetching && me.data === null) router.replace('/login');
   }, [me.isSuccess, me.isFetching, me.data, router]);
 
+  if (me.isError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-8">
+        <div
+          data-testid="api-error"
+          className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+        >
+          <h1 className="text-lg font-semibold tracking-tight text-[#1d1d1f]">Server nie je dostupný</h1>
+          <p className="mt-2 text-sm text-[#6e6e73]">
+            Aplikácia sa nevie spojiť s API. Skontroluj, či beží API a databáza (pnpm dev).
+          </p>
+          <button
+            data-testid="api-retry" onClick={() => me.refetch()} disabled={me.isFetching}
+            className="mt-6 rounded-full bg-[#0071e3] px-5 py-2 text-sm font-medium text-white hover:bg-[#0077ed] disabled:opacity-50"
+          >
+            {me.isFetching ? 'Skúšam…' : 'Skúsiť znova'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (me.isLoading || !me.data) return null;
 
   return (
