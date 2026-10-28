@@ -3,7 +3,7 @@
 Jednorazové stiahnutie všetkých dát z iDokladu, napríklad pri prechode na túto appku. Stačí aktívny prístup k API. Skript iba číta a v iDoklade nič nemení.
 
 ## 1. Prístup k API
-V iDoklade otvor **Nastavenia → API** (prípadne *Aplikácie → API*) a skopíruj **Client ID** a **Client Secret**. Ak tam je aj **Application ID**, skopíruj aj ten.
+V iDoklade otvor **Nastavení → Aplikace → API** a tlačidlom **Vygenerovat** si vytvor **Client Id** a **Client Secret**. V starších účtoch je to v *Nastavení → Uživatel → Nastavení API*. Application ID iDoklad bežne neuvádza a skript ho nepotrebuje.
 
 Do súboru `.env` v koreni repa (nie je v gite) pridaj:
 ```
