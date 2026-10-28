@@ -1,0 +1,5 @@
+{
+  "project": "invoices",
+  "sync": ["docs/**", ".superpowers/sdd/progress*.md", ".superpowers/sdd/web-ui-conventions.md"],
+  "state": ["docs/handoff/*.md"]
+}
