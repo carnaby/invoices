@@ -14,8 +14,10 @@ x-logging: &logging
     max-size: 10m
     max-file: '3'
 
+# Service names = container names: api, web and db would be generic DNS names on the shared network "edge"
+# (carnaby-web resolves http://api:3001), see docs/infra/rules.md part 6.
 services:
-  db:
+  invoices-db:
     image: postgres:16-alpine
     container_name: invoices-db
     restart: unless-stopped
@@ -36,16 +38,15 @@ services:
       start_interval: 2s
     logging: *logging
 
-  api:
+  invoices-api:
     image: ghcr.io/carnaby/invoices-api:${INVOICES_VERSION:-latest}
     container_name: invoices-api
     restart: unless-stopped
     depends_on:
-      db:
+      invoices-db:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      # The container name, not "db": the API is also on the shared network "edge".
       DATABASE_URL: postgres://invoices:${POSTGRES_PASSWORD}@invoices-db:5432/invoices
       APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env (at least 32 characters)}
       API_PORT: '3333'
@@ -66,11 +67,11 @@ services:
       start_interval: 5s
     logging: *logging
 
-  web:
+  invoices-web:
     image: ghcr.io/carnaby/invoices-web:${INVOICES_VERSION:-latest}
     container_name: invoices-web
     restart: unless-stopped
-    depends_on: [api]
+    depends_on: [invoices-api]
     networks: [default, edge]
     mem_limit: 512m
     labels:
