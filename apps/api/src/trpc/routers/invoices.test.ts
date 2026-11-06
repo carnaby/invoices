@@ -333,6 +333,26 @@ describe('paid invoices are locked', () => {
     expect((await caller.invoices.get({ id })).totals.total).toBe(150);
   });
 
+  it('a credit note (negative total, nothing paid) can still be edited', async () => {
+    const caller = await newUserCaller('jozef');
+    const credit = { ...baseInvoice, items: [{ description: 'Dobropis', quantity: 1, unitPrice: -50, vatRate: 0 }] };
+    const { id } = await caller.invoices.create(credit);
+    await caller.invoices.update({ id, data: { ...credit, customerName: 'Iná' } });
+    expect((await caller.invoices.get({ id })).invoice.customerName).toBe('Iná');
+  });
+
+  it('the total is checked as stored (rounded), so extra decimals cannot sneak below the paid amount', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await caller.invoices.addPayment({ id, amount: 100 });
+    // 3 x 33.334 = 100.00 as typed, but unit_price is stored as 33.33, so 99.99.
+    const items = [{ description: 'X', quantity: 3, unitPrice: 33.334, vatRate: 0 }];
+    await expect(caller.invoices.update({ id, data: { ...baseInvoice, items } })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect((await caller.invoices.get({ id })).totals.total).toBe(290);
+  });
+
   it('an invoice with a zero total is not locked', async () => {
     const caller = await newUserCaller('jozef');
     const zero = { ...baseInvoice, items: [{ description: 'Zadarmo', quantity: 1, unitPrice: 0, vatRate: 0 }] };

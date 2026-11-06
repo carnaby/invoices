@@ -90,9 +90,15 @@ export async function lockForEdit(tx: DbTx, userId: string, id: string) {
   return row;
 }
 
-/** Refuses an edit that would bring the invoice total below what is already paid. */
-export function checkNewTotal(row: { paidAmount: number; currency: string }, newTotal: number) {
-  if (toCents(newTotal) < toCents(row.paidAmount)) {
+/**
+ * Refuses an edit that brought the invoice total below what is already paid. Runs after the new items
+ * are written, on the stored (rounded) values; throwing rolls the edit back. Nothing paid → nothing to check,
+ * so credit notes with a negative total stay editable.
+ */
+export async function checkStoredTotal(tx: DbTx, id: string, row: { paidAmount: number; currency: string }) {
+  if (toCents(row.paidAmount) <= 0) return;
+  const items = await tx.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+  if (toCents(calcInvoiceTotals(items).total) < toCents(row.paidAmount)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `Suma faktúry nemôže byť nižšia ako už uhradených ${formatMoney(row.paidAmount, row.currency)}.`,

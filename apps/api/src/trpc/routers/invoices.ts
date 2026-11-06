@@ -3,12 +3,12 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { invoiceItems, invoices, settings } from '@invoices/db';
 import {
-  addPaymentSchema, calcInvoiceTotals, derivePaymentStatus, invoiceInputSchema, isOverdue,
+  addPaymentSchema, derivePaymentStatus, invoiceInputSchema, isOverdue,
   markPaidSchema, round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import {
-  checkAddedPayment, checkNewTotal, checkPaidAmount, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
+  checkAddedPayment, checkPaidAmount, checkStoredTotal, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
   lockForEdit, todayIso,
 } from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
@@ -67,7 +67,6 @@ export const invoicesRouter = router({
       try {
         return await ctx.db.transaction(async (tx) => {
           const current = await lockForEdit(tx, ctx.userId, input.id);
-          checkNewTotal(current, calcInvoiceTotals(items).total);
           await tx
             .update(invoices)
             .set({ ...invoice, updatedAt: new Date() })
@@ -76,6 +75,7 @@ export const invoicesRouter = router({
           await tx.insert(invoiceItems).values(
             items.map((item, i) => ({ ...item, invoiceId: input.id, position: i + 1 })),
           );
+          await checkStoredTotal(tx, input.id, current);
           return { id: input.id };
         });
       } catch (e) {
