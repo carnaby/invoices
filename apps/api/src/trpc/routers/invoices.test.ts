@@ -97,6 +97,41 @@ describe('invoices', () => {
     expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(50);
   });
 
+  it('addPayment refuses a payment above the remaining amount and accepts exactly the remainder', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    await caller.invoices.addPayment({ id, amount: 100 });
+    await expect(caller.invoices.addPayment({ id, amount: 190.01 })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Úhrada presahuje zostávajúcu sumu 190,00 EUR.',
+    });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(100);
+    await caller.invoices.addPayment({ id, amount: 190 });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(290);
+    await expect(caller.invoices.addPayment({ id, amount: 0.01 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('addPayment: two payments at once cannot together exceed the total', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    const results = await Promise.allSettled([
+      caller.invoices.addPayment({ id, amount: 200 }),
+      caller.invoices.addPayment({ id, amount: 200 }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(200);
+  });
+
+  it('markPaid refuses an amount above the invoice total', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    await expect(caller.invoices.markPaid({ id, paidAmount: 290.01 })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Úhrada presahuje sumu faktúry 290,00 EUR.',
+    });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(0);
+  });
+
   it('list filters by year, status, search and returns summary + years', async () => {
     const caller = await newUserCaller('jozef');
     await caller.invoices.create(baseInvoice); // 2026, unpaid, past due → overdue (total 290)

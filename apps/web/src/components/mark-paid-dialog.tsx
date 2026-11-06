@@ -37,6 +37,8 @@ export function MarkPaidDialog({
   });
 
   const value = parseAmount(amount);
+  // Same rule as the API: a payment cannot exceed what is left to pay.
+  const tooHigh = Math.round(value * 100) > Math.round(remaining * 100);
   const handleConfirm = () => {
     addPayment.mutate({ id: invoiceId, amount: value, paidDate: date || undefined });
   };
@@ -52,6 +54,11 @@ export function MarkPaidDialog({
           <Field label="Prijatá platba">
             <Input data-testid="paid-amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </Field>
+          {tooHigh && (
+            <p data-testid="paid-amount-error" className="-mt-2 text-xs text-[#ff3b30]">
+              Úhrada presahuje zostávajúcu sumu {formatMoney(remaining, currency)}.
+            </p>
+          )}
           <Field label="Dátum úhrady">
             <Input
               data-testid="paid-date"
@@ -80,7 +87,7 @@ export function MarkPaidDialog({
             type="button"
             data-testid="confirm"
             onClick={handleConfirm}
-            disabled={addPayment.isPending || value <= 0}
+            disabled={addPayment.isPending || value <= 0 || tooHigh}
           >
             Potvrdiť
           </Button>

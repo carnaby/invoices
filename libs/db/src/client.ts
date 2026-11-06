@@ -8,3 +8,5 @@ export function createDb(connectionString: string) {
   return Object.assign(db, { $pool: pool });
 }
 export type Db = ReturnType<typeof createDb>;
+/** The handle a `db.transaction` callback receives. */
+export type DbTx = Parameters<Parameters<Db['transaction']>[0]>[0];

@@ -8,7 +8,8 @@ import {
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import {
-  invoiceNotFound, loadInvoiceWithItems, loadOriginal, throwMissingOrLocked, todayIso,
+  checkAddedPayment, checkPaidAmount, loadInvoiceWithItems, loadOriginal,
+  throwMissingOrLocked, todayIso,
 } from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
 import { generateInvoicePdf } from '../../pdf/pdf.service';
@@ -165,34 +166,36 @@ export const invoicesRouter = router({
     return { ok: true };
   }),
 
-  markPaid: authedProcedure.input(markPaidSchema).mutation(async ({ ctx, input }) => {
-    const [updated] = await ctx.db
-      .update(invoices)
-      .set({
-        paidAmount: input.paidAmount,
-        paidDate: input.paidDate ?? (input.paidAmount > 0 ? todayIso() : null),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
-      .returning({ id: invoices.id });
-    if (!updated) throw invoiceNotFound();
-    return { id: updated.id };
-  }),
+  markPaid: authedProcedure.input(markPaidSchema).mutation(({ ctx, input }) =>
+    ctx.db.transaction(async (tx) => {
+      await checkPaidAmount(tx, ctx.userId, input.id, input.paidAmount);
+      await tx
+        .update(invoices)
+        .set({
+          paidAmount: input.paidAmount,
+          paidDate: input.paidDate ?? (input.paidAmount > 0 ? todayIso() : null),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
+      return { id: input.id };
+    }),
+  ),
 
-  // Adds in SQL so two payments recorded at once cannot overwrite each other.
-  addPayment: authedProcedure.input(addPaymentSchema).mutation(async ({ ctx, input }) => {
-    const [updated] = await ctx.db
-      .update(invoices)
-      .set({
-        paidAmount: sql`${invoices.paidAmount} + ${round2(input.amount)}`,
-        paidDate: input.paidDate ?? todayIso(),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
-      .returning({ id: invoices.id });
-    if (!updated) throw invoiceNotFound();
-    return { id: updated.id };
-  }),
+  // The check locks the invoice row, so two payments recorded at once are checked and added in turn.
+  addPayment: authedProcedure.input(addPaymentSchema).mutation(({ ctx, input }) =>
+    ctx.db.transaction(async (tx) => {
+      await checkAddedPayment(tx, ctx.userId, input.id, input.amount);
+      await tx
+        .update(invoices)
+        .set({
+          paidAmount: sql`${invoices.paidAmount} + ${round2(input.amount)}`,
+          paidDate: input.paidDate ?? todayIso(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
+      return { id: input.id };
+    }),
+  ),
 
   sendEmail: authedProcedure.input(sendEmailSchema).mutation(async ({ ctx, input }) => {
     const { invoice } = await loadInvoiceWithItems(ctx.db, ctx.userId, input.id);
