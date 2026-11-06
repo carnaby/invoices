@@ -10,7 +10,18 @@ import { Button, Card, ConfirmDialog, PageHeader, Table, TBody, Td, Th, THead, T
 import { formatDate, formatMoney, todayIso } from '@/lib/format';
 import { apiUrl, trpc } from '@/lib/trpc';
 
-type DialogState = 'none' | 'markPaid' | 'sendEmail' | 'delete';
+type DialogState = 'none' | 'markPaid' | 'sendEmail' | 'delete' | 'resetPayments';
+
+const LOCK_BADGE = {
+  idoklad: {
+    label: 'Uzamknutá · z iDokladu',
+    title: 'Faktúra bola prenesená z iDokladu a nedá sa meniť ani zmazať. Úhrady sa zapisujú ďalej.',
+  },
+  paid: {
+    label: 'Uzamknutá · uhradená',
+    title: 'Uhradená faktúra sa nedá meniť ani zmazať. Po zrušení úhrad sa odomkne.',
+  },
+} as const;
 
 function idLine(ico?: string | null, dic?: string | null, icDph?: string | null): string {
   return [ico && `IČO: ${ico}`, dic && `DIČ: ${dic}`, icDph && `IČ DPH: ${icDph}`]
@@ -33,11 +44,21 @@ export default function InvoiceDetailPage() {
       utils.invoices.list.invalidate();
       router.push('/invoices');
     },
+    // The invoice may have been locked meanwhile: reload so the page shows the lock.
+    onError: () => utils.invoices.get.invalidate({ id }),
+  });
+
+  const resetPayments = trpc.invoices.resetPayments.useMutation({
+    onSuccess: () => {
+      utils.invoices.get.invalidate({ id });
+      utils.invoices.list.invalidate();
+      setDialog('none');
+    },
   });
 
   if (query.isLoading || !query.data) return null;
 
-  const { invoice, items, totals, locked, hasOriginal } = query.data;
+  const { invoice, items, totals, locked, lockReason, hasOriginal } = query.data;
   const settings = settingsQuery.data;
   const status = derivePaymentStatus(totals.total, invoice.paidAmount);
   const overdue = isOverdue(invoice.dueDate, status, todayIso());
@@ -74,6 +95,11 @@ export default function InvoiceDetailPage() {
             <Button variant="secondary" data-testid="mark-paid" onClick={() => setDialog('markPaid')}>
               Označiť úhradu
             </Button>
+            {invoice.paidAmount > 0 && (
+              <Button variant="secondary" data-testid="reset-payments" onClick={() => setDialog('resetPayments')}>
+                Zrušiť úhrady
+              </Button>
+            )}
             {!locked && (
               <>
                 <Link
@@ -94,13 +120,13 @@ export default function InvoiceDetailPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <StatusBadge status={status} overdue={overdue} />
-        {locked && (
+        {lockReason && (
           <span
             data-testid="locked-badge"
-            title="Faktúra bola prenesená z iDokladu a nedá sa meniť ani zmazať. Úhrady sa zapisujú ďalej."
+            title={LOCK_BADGE[lockReason].title}
             className="inline-flex items-center rounded-full bg-[#86868b]/15 px-2.5 py-0.5 text-xs font-medium text-[#1d1d1f]"
           >
-            Uzamknutá · z iDokladu
+            {LOCK_BADGE[lockReason].label}
           </span>
         )}
         {status !== 'unpaid' && (
@@ -288,6 +314,22 @@ export default function InvoiceDetailPage() {
           setDialog('none');
         }}
         error={remove.error?.message}
+        pending={remove.isPending}
+      />
+      <ConfirmDialog
+        open={dialog === 'resetPayments'}
+        title="Zrušiť úhrady?"
+        description={`Uhradená suma ${formatMoney(invoice.paidAmount, invoice.currency)} sa vynuluje.${
+          lockReason === 'paid' ? ' Faktúra sa tým odomkne.' : ''
+        }`}
+        confirmLabel="Zrušiť úhrady"
+        onConfirm={() => resetPayments.mutate({ id })}
+        onCancel={() => {
+          resetPayments.reset();
+          setDialog('none');
+        }}
+        error={resetPayments.error?.message}
+        pending={resetPayments.isPending}
       />
     </div>
   );

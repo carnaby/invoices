@@ -13,12 +13,14 @@ export default function EditInvoicePage() {
 
   if (query.isLoading || !query.data) return null;
 
-  if (query.data.locked) {
+  if (query.data.lockReason) {
     return (
       <div>
         <PageHeader title={`Faktúra ${query.data.invoice.number}`} />
         <p data-testid="locked-message" className="text-sm text-[#1d1d1f]">
-          Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.{' '}
+          {query.data.lockReason === 'idoklad'
+            ? 'Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.'
+            : 'Uhradená faktúra je uzamknutá a nedá sa meniť ani zmazať. Odomkne sa po zrušení úhrad.'}{' '}
           <Link href={`/invoices/${id}`} className="text-[#0071e3] hover:underline">
             Späť na faktúru
           </Link>

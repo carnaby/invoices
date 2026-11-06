@@ -35,6 +35,8 @@ export function MarkPaidDialog({
       utils.invoices.list.invalidate();
       onClose();
     },
+    // The server refused, e.g. another tab paid meanwhile: reload so the dialog checks the real remainder.
+    onError: () => utils.invoices.get.invalidate({ id: invoiceId }),
   });
 
   const value = parseAmount(amount);

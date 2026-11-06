@@ -240,6 +240,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   error,
+  pending = false,
 }: {
   open: boolean;
   title: string;
@@ -248,6 +249,8 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   error?: string;
+  /** Disables Confirm while the action runs, so a double click does not send it twice. */
+  pending?: boolean;
 }) {
   if (!open) return null;
   return (
@@ -264,7 +267,7 @@ export function ConfirmDialog({
           <Button variant="secondary" data-testid="cancel" onClick={onCancel}>
             Zrušiť
           </Button>
-          <Button variant="danger" data-testid="confirm" onClick={onConfirm}>
+          <Button variant="danger" data-testid="confirm" onClick={onConfirm} disabled={pending}>
             {confirmLabel}
           </Button>
         </div>
