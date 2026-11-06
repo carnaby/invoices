@@ -37,6 +37,16 @@ export async function throwMissingOrLocked(db: Db | DbTx, userId: string, id: st
   throw row ? invoiceLocked() : invoiceNotFound();
 }
 
+/** One query for the download: null when the invoice is missing, `pdf: null` when it has no original. */
+export async function loadInvoiceOriginal(db: Db, userId: string, invoiceId: string) {
+  const [row] = await db
+    .select({ number: invoices.number, pdf: invoiceOriginals.pdf })
+    .from(invoices)
+    .leftJoin(invoiceOriginals, eq(invoiceOriginals.invoiceId, invoices.id))
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.userId, userId)));
+  return row ?? null;
+}
+
 export async function loadOriginal(db: Db, userId: string, invoiceId: string) {
   const [row] = await db
     .select({ pdf: invoiceOriginals.pdf, fileName: invoiceOriginals.fileName, number: invoices.number })
