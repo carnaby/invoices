@@ -10,6 +10,7 @@ import { env } from './env';
 import { appRouter } from './trpc/app-router';
 import { createContextFactory } from './trpc/context';
 import { createFilesRouter } from './rest/files';
+import { TRUST_PROXY } from './trpc/trust-proxy';
 
 async function bootstrap() {
   await runMigrations(env.databaseUrl);
@@ -19,6 +20,7 @@ async function bootstrap() {
   // one with a higher limit — the signature upload endpoint sends base64
   // image payloads that can exceed the default well before 1 MB.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  app.set('trust proxy', TRUST_PROXY);
   app.useBodyParser('json', { limit: '2mb' });
   app.use(cookieParser());
   app.enableCors({ origin: env.webOrigin, credentials: true });

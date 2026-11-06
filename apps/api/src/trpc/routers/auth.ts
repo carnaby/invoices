@@ -4,6 +4,7 @@ import { users } from '@invoices/db';
 import { changePasswordSchema, loginSchema, registerSchema } from '@invoices/shared';
 import { authedProcedure, publicProcedure, router } from '../trpc';
 import { isRegistrationEnabled } from '../../env';
+import { loginThrottle } from '../../auth/login-throttle';
 import { changeUserPassword, createSession, destroySession, registerUser, verifyCredentials } from '../../auth/auth.service';
 
 export const authRouter = router({
@@ -17,7 +18,9 @@ export const authRouter = router({
     return user;
   }),
   login: publicProcedure.input(loginSchema).mutation(async ({ ctx, input }) => {
+    const attempt = loginThrottle.begin(ctx.clientIp, input.username);
     const user = await verifyCredentials(ctx.db, input);
+    attempt.succeeded();
     ctx.setSessionCookie(await createSession(ctx.db, user.id));
     return user;
   }),

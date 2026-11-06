@@ -4,12 +4,16 @@ import { settings, users } from '@invoices/db';
 import { createTestContext, resolveUserId } from '../context';
 import { createCaller } from '../app-router';
 import { createSession, verifyCredentials } from '../../auth/auth.service';
+import { loginThrottle } from '../../auth/login-throttle';
 import type { Db } from '@invoices/db';
 
 let db: Db; let close: () => Promise<void>;
 beforeAll(async () => { const t = await createTestDb(); db = t.db; close = t.close; });
 afterAll(async () => close());
-beforeEach(async () => truncateAll(db));
+beforeEach(async () => {
+  loginThrottle.reset();
+  await truncateAll(db);
+});
 
 describe('auth', () => {
   it('register creates user + settings row and logs in (session cookie set)', async () => {
@@ -134,5 +138,23 @@ describe('registration toggle', () => {
     await expect(caller.auth.registrationEnabled()).resolves.toBe(false);
     await expect(caller.auth.register({ username: 'dev', password: 'password123' }))
       .rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('login throttle', () => {
+  it('6th attempt from one IP gets TOO_MANY_REQUESTS even with the right password; another IP logs in', async () => {
+    await createCaller(createTestContext(db)).auth.register({ username: 'carnaby', password: 'password123' });
+    const attacker = createCaller(createTestContext(db, null, '203.0.113.7'));
+    for (let i = 0; i < 5; i++) {
+      await expect(attacker.auth.login({ username: 'carnaby', password: 'wrongwrong' }))
+        .rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    }
+    await expect(attacker.auth.login({ username: 'carnaby', password: 'password123' }))
+      .rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    const owner = createTestContext(db, null, '198.51.100.1');
+    await expect(createCaller(owner).auth.login({ username: 'carnaby', password: 'password123' }))
+      .resolves.toMatchObject({ username: 'carnaby' });
+    expect(owner.cookieJar.token).toBeDefined();
   });
 });

@@ -6,6 +6,8 @@ import { sessions, type Db } from '@invoices/db';
 export interface TrpcContext {
   db: Db;
   userId: string | null;
+  /** Visitor IP (from X-Forwarded-For via Express `trust proxy`, see main.ts). */
+  clientIp: string;
   getSessionToken(): string | undefined;
   setSessionCookie(token: string | null): void;
 }
@@ -26,6 +28,11 @@ export async function resolveUserId(db: Db, token: string | undefined): Promise<
   return row?.userId ?? null;
 }
 
+/** `Secure` in production: the cookie never goes over plain http (e.g. the first request before Caddy's redirect). */
+function cookieOptions() {
+  return { httpOnly: true, sameSite: 'lax' as const, path: '/', secure: process.env.NODE_ENV === 'production' };
+}
+
 export function createContextFactory(db: Db) {
   return async ({ req, res }: { req: Request; res: Response }): Promise<TrpcContext> => {
     const token = (req.cookies?.[SESSION_COOKIE] as string | undefined) ?? undefined;
@@ -33,15 +40,14 @@ export function createContextFactory(db: Db) {
     return {
       db,
       userId,
+      clientIp: req.ip ?? req.socket?.remoteAddress ?? 'unknown',
       getSessionToken: () => token,
       setSessionCookie: (newToken) => {
         if (newToken === null) {
-          res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
+          res.clearCookie(SESSION_COOKIE, cookieOptions());
         } else {
           res.cookie(SESSION_COOKIE, newToken, {
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/',
+            ...cookieOptions(),
             maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
           });
         }
@@ -51,10 +57,11 @@ export function createContextFactory(db: Db) {
 }
 
 /** In-memory context for integration tests — captures the cookie instead of HTTP. */
-export function createTestContext(db: Db, userId: string | null = null) {
+export function createTestContext(db: Db, userId: string | null = null, clientIp = '127.0.0.1') {
   const ctx = {
     db,
     userId,
+    clientIp,
     cookieJar: {} as { token?: string },
     getSessionToken: (): string | undefined => ctx.cookieJar.token,
     setSessionCookie: (t: string | null) => {
