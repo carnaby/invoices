@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { createTestDb, truncateAll } from '@invoices/db/src/testing';
-import type { Db } from '@invoices/db';
+import { invoiceOriginals, type Db } from '@invoices/db';
 import { createTestContext } from '../trpc/context';
 import { createCaller } from '../trpc/app-router';
 import { setTransportFactory } from './email.service';
@@ -45,6 +45,23 @@ describe('invoices.sendEmail', () => {
     const { invoice } = await caller.invoices.get({ id });
     expect(invoice.sentAt).not.toBeNull();
   }, 60000);
+
+  it('attaches the iDoklad original instead of a generated PDF when the invoice has one', async () => {
+    const caller = await setupUserWithSmtp();
+    const { id } = await caller.invoices.create({
+      number: '20260001', customerName: 'Test s.r.o.', customerEmail: 'billing@example.com',
+      issueDate: '2026-01-10', dueDate: '2026-01-24', deliveryDate: '2026-01-10',
+      items: [{ description: 'X', quantity: 1, unitPrice: 100, vatRate: 0 }],
+    });
+    const pdf = Buffer.from('%PDF-1.4 original from iDoklad');
+    await db.insert(invoiceOriginals).values({ invoiceId: id, pdf, fileName: 'faktura-20260001-idoklad.pdf' });
+
+    await caller.invoices.sendEmail({ id, subject: 'Faktúra 20260001', body: 'V prílohe faktúra.' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].attachments).toHaveLength(1);
+    expect(sent[0].attachments[0].filename).toBe('faktura-20260001-idoklad.pdf');
+    expect(Buffer.compare(sent[0].attachments[0].content, pdf)).toBe(0);
+  });
 
   it('fails with PRECONDITION_FAILED when customer has no email', async () => {
     const caller = await setupUserWithSmtp();

@@ -46,5 +46,23 @@ export function createFilesRouter(db: Db): Router {
     }
   });
 
+  r.get('/invoices/:id/original', async (req, res) => {
+    const userId = await resolveUserId(db, req.cookies?.[SESSION_COOKIE]);
+    if (!userId) return res.status(401).json({ error: 'Musíte byť prihlásený' });
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Faktúra neexistuje' });
+    const { loadInvoiceWithItems, loadOriginal } = await import('../invoices/invoices.service');
+    try {
+      await loadInvoiceWithItems(db, userId, req.params.id);
+    } catch (e: any) {
+      if (e?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Faktúra neexistuje' });
+      throw e;
+    }
+    const original = await loadOriginal(db, userId, req.params.id);
+    if (!original) return res.status(404).json({ error: 'Originál neexistuje' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="faktura-${original.number}-original.pdf"`);
+    res.send(original.pdf);
+  });
+
   return r;
 }

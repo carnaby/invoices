@@ -7,7 +7,9 @@ import {
   markPaidSchema, round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
-import { invoiceNotFound, loadInvoiceWithItems, throwMissingOrLocked, todayIso } from '../../invoices/invoices.service';
+import {
+  invoiceNotFound, loadInvoiceWithItems, loadOriginal, throwMissingOrLocked, todayIso,
+} from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
 import { generateInvoicePdf } from '../../pdf/pdf.service';
 import { env } from '../../env';
@@ -199,13 +201,16 @@ export const invoicesRouter = router({
     if (!invoice.customerEmail) {
       throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Odberateľ nemá vyplnený e-mail' });
     }
-    const pdf = await generateInvoicePdf(ctx.db, ctx.userId, input.id);
+    const original = await loadOriginal(ctx.db, ctx.userId, input.id);
+    const attachment = original
+      ? { filename: original.fileName, content: original.pdf }
+      : { filename: `faktura-${invoice.number}.pdf`, content: await generateInvoicePdf(ctx.db, ctx.userId, input.id) };
     await sendMail(cfg, {
       to: [invoice.customerEmail],
       cc: invoice.customerCcEmails.length ? invoice.customerCcEmails : undefined,
       subject: input.subject,
       text: input.body,
-      attachments: [{ filename: `faktura-${invoice.number}.pdf`, content: pdf }],
+      attachments: [attachment],
     });
     const sentAt = new Date();
     await ctx.db.update(invoices).set({ sentAt, updatedAt: sentAt })
