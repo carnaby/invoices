@@ -71,7 +71,7 @@ export const invoicesRouter = router({
             .set({ ...invoice, updatedAt: new Date() })
             .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId), isNull(invoices.lockedAt)))
             .returning({ id: invoices.id });
-          if (!updated) await throwMissingOrLocked(ctx.db, ctx.userId, input.id);
+          if (!updated) await throwMissingOrLocked(tx, ctx.userId, input.id);
           await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, input.id));
           await tx.insert(invoiceItems).values(
             items.map((item, i) => ({ ...item, invoiceId: input.id, position: i + 1 })),

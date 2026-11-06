@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
-import { createTestDb, truncateAll } from '@invoices/db/src/testing';
+import { createTestDb, truncateAll, TEST_DB_URL } from '@invoices/db/src/testing';
 import { eq } from 'drizzle-orm';
-import { invoiceOriginals, invoices, type Db } from '@invoices/db';
+import { createDb, invoiceOriginals, invoices, type Db } from '@invoices/db';
 import { createTestContext } from '../context';
 import { createCaller } from '../app-router';
 import { todayIso } from '../../invoices/invoices.service';
@@ -209,6 +209,22 @@ async function lock(id: string) {
 }
 
 describe('locked invoices (imported from iDoklad)', () => {
+  it('update of a locked invoice answers FORBIDDEN even with a single-connection pool', async () => {
+    const u = await createCaller(createTestContext(db)).auth.register({ username: 'jozef', password: 'password123' });
+    const { id } = await createCaller(createTestContext(db, u.id)).invoices.create(baseInvoice);
+    await lock(id);
+    // The lookup after a failed guarded update must run inside the transaction,
+    // not wait for a second pool connection while the transaction holds the only one.
+    const single = createDb(TEST_DB_URL);
+    (single.$pool.options as { max: number }).max = 1;
+    try {
+      const caller = createCaller(createTestContext(single, u.id));
+      await expect(caller.invoices.update({ id, data: baseInvoice })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    } finally {
+      await single.$pool.end();
+    }
+  }, 5000);
+
   it('update and remove are FORBIDDEN and change nothing, items included', async () => {
     const caller = await newUserCaller('jozef');
     const { id } = await caller.invoices.create(baseInvoice);
