@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ContactInput } from '@invoices/shared';
 import { contactInputSchema } from '@invoices/shared';
-import { Button, Card, Field, Input } from '@/components/ui';
+import { Button, Card, Field, Input, CardTitle } from '@/components/ui';
 
 type FormState = {
   companyName: string;
@@ -110,9 +110,9 @@ export function ContactForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Firma</h2>
+        <CardTitle>Firma</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field label="Názov firmy *" error={errors.companyName}>
@@ -132,7 +132,7 @@ export function ContactForm({
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Adresa</h2>
+        <CardTitle>Adresa</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field label="Ulica a číslo" error={errors.street}>
@@ -152,7 +152,7 @@ export function ContactForm({
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Kontakt</h2>
+        <CardTitle>Kontakt</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="E-mail" error={errors.email}>
             <Input data-testid="email" type="email" value={state.email} onChange={set('email')} />
@@ -180,7 +180,7 @@ export function ContactForm({
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Fakturácia</h2>
+        <CardTitle>Fakturácia</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Predvolená splatnosť (dni)" error={errors.defaultDueDays}>
             <Input
@@ -212,7 +212,7 @@ export function ContactForm({
         </div>
       </Card>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         <Button type="button" variant="secondary" onClick={() => router.push('/contacts')}>
           Zrušiť
         </Button>

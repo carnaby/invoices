@@ -45,11 +45,11 @@ export default function InvoicesPage() {
   const years = [...(list.data?.years ?? [])].sort((a, b) => b - a);
 
   const totalValue = summary.byCurrency.length
-    ? summary.byCurrency.map((b) => formatMoney(b.total, b.currency)).join(' · ')
-    : formatMoney(0);
+    ? summary.byCurrency.map((b) => formatMoney(b.total, b.currency))
+    : [formatMoney(0)];
   const unpaidValue = summary.byCurrency.length
-    ? summary.byCurrency.map((b) => formatMoney(b.unpaid, b.currency)).join(' · ')
-    : formatMoney(0);
+    ? summary.byCurrency.map((b) => formatMoney(b.unpaid, b.currency))
+    : [formatMoney(0)];
   const hasUnpaid = summary.byCurrency.some((b) => b.unpaid > 0);
 
   return (
@@ -57,15 +57,29 @@ export default function InvoicesPage() {
       <PageHeader
         title="Faktúry"
         action={
-          <Button data-testid="new-invoice" onClick={() => router.push('/invoices/new')}>
+          <Button
+            data-testid="new-invoice"
+            className="max-lg:hidden"
+            onClick={() => router.push('/invoices/new')}
+          >
             Nová faktúra
           </Button>
         }
       />
 
-      <Card className="mb-6">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="w-full sm:w-48">
+      <Card className="mb-4 sm:mb-6">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
+          <div className="col-span-2 sm:order-last sm:min-w-[220px] sm:flex-1">
+            <Input
+              label="Hľadať"
+              type="search"
+              data-testid="search"
+              placeholder="Číslo alebo odberateľ…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="min-w-0 sm:w-48">
             <Select
               label="Rok"
               data-testid="year-filter"
@@ -80,7 +94,7 @@ export default function InvoicesPage() {
               ))}
             </Select>
           </div>
-          <div className="w-full sm:w-56">
+          <div className="min-w-0 sm:w-56">
             <Select
               label="Stav"
               data-testid="status-filter"
@@ -94,20 +108,16 @@ export default function InvoicesPage() {
               ))}
             </Select>
           </div>
-          <div className="min-w-[220px] flex-1">
-            <Input
-              label="Hľadať"
-              data-testid="search"
-              placeholder="Hľadať podľa čísla alebo odberateľa…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
         </div>
       </Card>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <StatTile data-testid="summary-count" label="Počet faktúr" value={invoiceCountLabel(summary.count)} />
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-6 sm:grid-cols-3 sm:gap-6">
+        <StatTile
+          data-testid="summary-count"
+          className="max-sm:hidden"
+          label="Počet faktúr"
+          value={invoiceCountLabel(summary.count)}
+        />
         <StatTile data-testid="summary-total" label="Spolu" value={totalValue} />
         <StatTile
           data-testid="summary-unpaid"
@@ -118,6 +128,7 @@ export default function InvoicesPage() {
       </div>
 
       <Card>
+        <p className="mb-1 text-xs font-medium text-muted sm:hidden">{invoiceCountLabel(summary.count)}</p>
         <InvoiceTable invoices={invoices} />
       </Card>
     </div>

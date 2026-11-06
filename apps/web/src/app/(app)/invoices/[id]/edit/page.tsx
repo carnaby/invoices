@@ -17,11 +17,11 @@ export default function EditInvoicePage() {
     return (
       <div>
         <PageHeader title={`Faktúra ${query.data.invoice.number}`} />
-        <p data-testid="locked-message" className="text-sm text-[#1d1d1f]">
+        <p data-testid="locked-message" className="text-sm text-ink">
           {query.data.lockReason === 'idoklad'
             ? 'Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.'
             : 'Uhradená faktúra je uzamknutá a nedá sa meniť ani zmazať. Odomkne sa po zrušení úhrad.'}{' '}
-          <Link href={`/invoices/${id}`} className="text-[#0071e3] hover:underline">
+          <Link href={`/invoices/${id}`} className="text-accent hover:underline">
             Späť na faktúru
           </Link>
         </p>

@@ -1,20 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Button, Card, ConfirmDialog, Input, PageHeader, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
+import Link from 'next/link';
+import { Button, Card, ChevronRightIcon, cn, ConfirmDialog, EmptyState, Input, PageHeader, PlusIcon, TrashIcon } from '@/components/ui';
 import { trpc } from '@/lib/trpc';
 
-function TrashIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"
-      />
-    </svg>
-  );
-}
+const cols = 'md:grid-cols-[minmax(0,1.6fr)_7rem_minmax(0,1fr)_minmax(0,1.4fr)_4rem] md:gap-x-4';
 
 export default function ContactsPage() {
   const router = useRouter();
@@ -44,13 +35,15 @@ export default function ContactsPage() {
         title="Kontakty"
         action={
           <Button data-testid="new-contact" onClick={() => router.push('/contacts/new')}>
+            <PlusIcon size={18} />
             Nový kontakt
           </Button>
         }
       />
 
-      <Card className="mb-6">
+      <Card className="mb-4 sm:mb-6">
         <Input
+          type="search"
           data-testid="search"
           placeholder="Hľadať podľa firmy, IČO alebo mesta…"
           value={search}
@@ -58,33 +51,53 @@ export default function ContactsPage() {
         />
       </Card>
 
-      <Card>
+      <Card className="py-2 sm:py-6">
         {rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#6e6e73]">Žiadne kontakty.</p>
+          <EmptyState>Žiadne kontakty.</EmptyState>
         ) : (
-          <Table>
-            <THead>
-              <Tr>
-                <Th>Firma</Th>
-                <Th>IČO</Th>
-                <Th>Mesto</Th>
-                <Th>E-mail</Th>
-                <Th className="text-right">Akcie</Th>
-              </Tr>
-            </THead>
-            <TBody>
+          <div role="table" className="text-sm">
+            <div
+              role="row"
+              className={cn('hidden border-b border-line pb-3 text-xs font-medium uppercase tracking-wide text-muted md:grid', cols)}
+            >
+              <span role="columnheader">Firma</span>
+              <span role="columnheader">IČO</span>
+              <span role="columnheader">Mesto</span>
+              <span role="columnheader">E-mail</span>
+              <span role="columnheader" className="text-right">
+                Akcie
+              </span>
+            </div>
+            <div className="divide-y divide-line">
               {rows.map((c) => (
-                <Tr
+                <div
                   key={c.id}
+                  role="row"
                   data-testid={`contact-row-${c.companyName}`}
-                  className="cursor-pointer"
+                  className={cn(
+                    'grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-3 transition',
+                    '-mx-4 px-4 active:bg-canvas sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:hover:bg-canvas/60',
+                    cols,
+                  )}
                   onClick={() => router.push(`/contacts/${c.id}`)}
                 >
-                  <Td className="font-medium">{c.companyName}</Td>
-                  <Td>{c.ico || '—'}</Td>
-                  <Td>{c.city || '—'}</Td>
-                  <Td>{c.email || '—'}</Td>
-                  <Td className="text-right">
+                  <div role="cell" className="min-w-0">
+                    <Link
+                      href={`/contacts/${c.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="block truncate font-medium text-ink"
+                    >
+                      {c.companyName}
+                    </Link>
+                    {/* Phone: the other columns as one muted line. */}
+                    <p className="truncate text-xs text-muted md:hidden">
+                      {[c.ico && `IČO ${c.ico}`, c.city, c.email].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                  </div>
+                  <span role="cell" className="hidden md:block">{c.ico || '—'}</span>
+                  <span role="cell" className="hidden truncate md:block">{c.city || '—'}</span>
+                  <span role="cell" className="hidden truncate md:block">{c.email || '—'}</span>
+                  <div role="cell" className="flex items-center justify-end gap-1">
                     <button
                       type="button"
                       data-testid="delete-contact"
@@ -93,15 +106,16 @@ export default function ContactsPage() {
                         e.stopPropagation();
                         setPendingDelete({ id: c.id, companyName: c.companyName });
                       }}
-                      className="rounded-lg p-1.5 text-[#8e8e93] transition hover:bg-[#ff3b30]/10 hover:text-[#ff3b30]"
+                      className="rounded-lg p-2 text-subtle transition hover:bg-danger/10 hover:text-danger md:p-1.5"
                     >
-                      <TrashIcon />
+                      <TrashIcon size={18} />
                     </button>
-                  </Td>
-                </Tr>
+                    <ChevronRightIcon size={18} className="text-subtle md:hidden" />
+                  </div>
+                </div>
               ))}
-            </TBody>
-          </Table>
+            </div>
+          </div>
         )}
       </Card>
 

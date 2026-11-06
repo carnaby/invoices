@@ -42,11 +42,12 @@ export default function DashboardPage() {
   return (
     <div>
       <PageHeader
-        title="Dashboard"
+        title="Prehľad"
         action={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Select
               data-testid="year-select"
+              className="w-auto pr-9"
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
             >
@@ -59,6 +60,7 @@ export default function DashboardPage() {
             {currencies.length > 1 && (
               <Select
                 data-testid="currency-select"
+                className="w-auto pr-9"
                 value={activeCurrency}
                 onChange={(e) => setSelectedCurrency(e.target.value)}
               >
@@ -73,7 +75,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-6 lg:grid-cols-4">
         <StatTile
           data-testid="stat-invoiced"
           label="Fakturované"
@@ -98,21 +100,21 @@ export default function DashboardPage() {
         />
       </div>
 
-      <Card className="mb-8">
-        <h2 className="mb-6 text-sm font-medium text-[#6e6e73]">Fakturácia podľa mesiacov</h2>
-        <div data-testid="monthly-chart" className="flex items-end gap-2 sm:gap-4">
+      <Card className="mb-4 sm:mb-8">
+        <h2 className="mb-4 text-sm font-medium text-muted sm:mb-6">Fakturácia podľa mesiacov</h2>
+        <div data-testid="monthly-chart" className="flex items-end gap-1 sm:gap-4">
           {monthly.map((amount, i) => {
             const h = maxMonthly === 0 ? 0 : Math.round((amount / maxMonthly) * 100);
             return (
               <div key={i} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-32 w-full items-end">
+                <div className="flex h-28 w-full items-end sm:h-32">
                   <div
                     title={formatMoney(amount, active.currency)}
-                    className="w-full rounded-t-md bg-[#0071e3] transition-all"
+                    className="w-full rounded-t-md bg-accent transition-all"
                     style={{ height: `${h}%` }}
                   />
                 </div>
-                <span className="text-xs text-[#6e6e73]">{MONTH_LABELS[i]}</span>
+                <span className="text-[10px] text-muted sm:text-xs">{MONTH_LABELS[i]}</span>
               </div>
             );
           })}
@@ -122,7 +124,7 @@ export default function DashboardPage() {
       <Card>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight">Posledné faktúry</h2>
-          <Link href="/invoices" className="text-sm font-medium text-[#0071e3] hover:underline">
+          <Link href="/invoices" className="text-sm font-medium text-accent hover:underline">
             Všetky faktúry →
           </Link>
         </div>

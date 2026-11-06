@@ -6,7 +6,22 @@ import { calcItemTotals, derivePaymentStatus, isOverdue } from '@invoices/shared
 import { MarkPaidDialog } from '@/components/mark-paid-dialog';
 import { SendEmailDialog } from '@/components/send-email-dialog';
 import { StatusBadge } from '@/components/status-badge';
-import { Button, Card, ConfirmDialog, PageHeader, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  buttonClasses,
+  Card,
+  CardTitle,
+  CheckCircleIcon,
+  ConfirmDialog,
+  DownloadIcon,
+  EditIcon,
+  FileIcon,
+  MailIcon,
+  PageHeader,
+  TrashIcon,
+  UndoIcon,
+} from '@/components/ui';
 import { formatDate, formatMoney, todayIso } from '@/lib/format';
 import { apiUrl, trpc } from '@/lib/trpc';
 
@@ -22,6 +37,9 @@ const LOCK_BADGE = {
     title: 'Uhradená faktúra sa nedá meniť ani zmazať. Po zrušení úhrad sa odomkne.',
   },
 } as const;
+
+const ITEM_COLS =
+  'md:grid-cols-[minmax(0,1fr)_5rem_3rem_7rem_4.5rem_7rem_6rem_7rem] md:gap-x-4';
 
 function idLine(ico?: string | null, dic?: string | null, icDph?: string | null): string {
   return [ico && `IČO: ${ico}`, dic && `DIČ: ${dic}`, icDph && `IČ DPH: ${icDph}`]
@@ -67,15 +85,39 @@ export default function InvoiceDetailPage() {
     <div>
       <PageHeader
         title={`Faktúra ${invoice.number}`}
+        meta={
+          <>
+            <StatusBadge status={status} overdue={overdue} />
+            {lockReason && (
+              <Badge tone="neutral" data-testid="locked-badge" title={LOCK_BADGE[lockReason].title}>
+                {LOCK_BADGE[lockReason].label}
+              </Badge>
+            )}
+            {invoice.sentAt && (
+              <Badge tone="blue" data-testid="sent-info">
+                Odoslaná {new Date(invoice.sentAt).toLocaleDateString('sk-SK')}
+              </Badge>
+            )}
+            {status !== 'unpaid' && (
+              <span data-testid="paid-info" className="text-sm text-muted">
+                {status === 'paid'
+                  ? `Uhradené${invoice.paidDate ? ' ' + formatDate(invoice.paidDate) : ''}`
+                  : `Uhradené ${formatMoney(invoice.paidAmount, invoice.currency)} z ${formatMoney(totals.total, invoice.currency)}`}
+              </span>
+            )}
+          </>
+        }
         action={
-          <div className="flex flex-wrap items-center gap-3">
+          // Phone: a 2-column grid of full-width buttons. Desktop: one wrapping row.
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
             <a
               data-testid="download-pdf"
               href={`${apiUrl}/files/invoices/${id}/pdf`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-xl border border-[#e8e8ed] bg-white px-4 py-2.5 text-sm font-medium text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+              className={buttonClasses('secondary')}
             >
+              <DownloadIcon size={18} />
               Stiahnuť PDF
             </a>
             {hasOriginal && (
@@ -84,32 +126,35 @@ export default function InvoiceDetailPage() {
                 href={`${apiUrl}/files/invoices/${id}/original`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-xl border border-[#e8e8ed] bg-white px-4 py-2.5 text-sm font-medium text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+                className={buttonClasses('secondary')}
               >
+                <FileIcon size={18} />
                 Originál z iDokladu
               </a>
             )}
             <Button variant="secondary" data-testid="send-email" onClick={() => setDialog('sendEmail')}>
-              Odoslať e-mailom
+              <MailIcon size={18} />
+              <span className="sm:hidden">E-mail</span>
+              <span className="max-sm:hidden">Odoslať e-mailom</span>
             </Button>
             <Button variant="secondary" data-testid="mark-paid" onClick={() => setDialog('markPaid')}>
+              <CheckCircleIcon size={18} />
               Označiť úhradu
             </Button>
             {invoice.paidAmount > 0 && (
               <Button variant="secondary" data-testid="reset-payments" onClick={() => setDialog('resetPayments')}>
+                <UndoIcon size={18} />
                 Zrušiť úhrady
               </Button>
             )}
             {!locked && (
               <>
-                <Link
-                  href={`/invoices/${id}/edit`}
-                  data-testid="edit-invoice"
-                  className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0077ed]"
-                >
+                <Link href={`/invoices/${id}/edit`} data-testid="edit-invoice" className={buttonClasses('primary')}>
+                  <EditIcon size={18} />
                   Upraviť
                 </Link>
                 <Button variant="danger" data-testid="delete-invoice" onClick={() => setDialog('delete')}>
+                  <TrashIcon size={18} />
                   Zmazať
                 </Button>
               </>
@@ -118,38 +163,10 @@ export default function InvoiceDetailPage() {
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <StatusBadge status={status} overdue={overdue} />
-        {lockReason && (
-          <span
-            data-testid="locked-badge"
-            title={LOCK_BADGE[lockReason].title}
-            className="inline-flex items-center rounded-full bg-[#86868b]/15 px-2.5 py-0.5 text-xs font-medium text-[#1d1d1f]"
-          >
-            {LOCK_BADGE[lockReason].label}
-          </span>
-        )}
-        {status !== 'unpaid' && (
-          <span data-testid="paid-info" className="text-sm text-[#6e6e73]">
-            {status === 'paid'
-              ? `Uhradené${invoice.paidDate ? ' ' + formatDate(invoice.paidDate) : ''}`
-              : `Uhradené ${formatMoney(invoice.paidAmount, invoice.currency)} z ${formatMoney(totals.total, invoice.currency)}`}
-          </span>
-        )}
-        {invoice.sentAt && (
-          <span
-            data-testid="sent-info"
-            className="inline-flex items-center rounded-full bg-[#0071e3]/10 px-2.5 py-0.5 text-xs font-medium text-[#0071e3]"
-          >
-            Odoslaná {new Date(invoice.sentAt).toLocaleDateString('sk-SK')}
-          </span>
-        )}
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:mb-6 sm:grid-cols-2 sm:gap-6">
         <Card>
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Dodávateľ</h2>
-          <div className="space-y-1 text-sm text-[#1d1d1f]">
+          <CardTitle className="sm:mb-4">Dodávateľ</CardTitle>
+          <div className="space-y-1 text-sm text-ink">
             <p className="font-medium">{settings?.supplierName || '—'}</p>
             {settings?.supplierStreet && <p>{settings.supplierStreet}</p>}
             {(settings?.supplierZip || settings?.supplierCity) && (
@@ -157,15 +174,15 @@ export default function InvoiceDetailPage() {
             )}
             {settings?.supplierCountry && <p>{settings.supplierCountry}</p>}
             {idLine(settings?.supplierIco, settings?.supplierDic, settings?.supplierIcDph) && (
-              <p className="pt-1 text-[#6e6e73]">
+              <p className="pt-1 text-muted">
                 {idLine(settings?.supplierIco, settings?.supplierDic, settings?.supplierIcDph)}
               </p>
             )}
           </div>
         </Card>
         <Card>
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Odberateľ</h2>
-          <div className="space-y-1 text-sm text-[#1d1d1f]">
+          <CardTitle className="sm:mb-4">Odberateľ</CardTitle>
+          <div className="space-y-1 text-sm text-ink">
             <p className="font-medium">{invoice.customerName}</p>
             {invoice.customerStreet && <p>{invoice.customerStreet}</p>}
             {(invoice.customerZip || invoice.customerCity) && (
@@ -173,7 +190,7 @@ export default function InvoiceDetailPage() {
             )}
             {invoice.customerCountry && <p>{invoice.customerCountry}</p>}
             {idLine(invoice.customerIco, invoice.customerDic, invoice.customerIcDph) && (
-              <p className="pt-1 text-[#6e6e73]">
+              <p className="pt-1 text-muted">
                 {idLine(invoice.customerIco, invoice.customerDic, invoice.customerIcDph)}
               </p>
             )}
@@ -181,8 +198,8 @@ export default function InvoiceDetailPage() {
         </Card>
       </div>
 
-      <Card className="mb-6">
-        <div className="grid grid-cols-1 gap-6 text-sm sm:grid-cols-3">
+      <Card className="mb-4 sm:mb-6">
+        <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3 sm:gap-6">
           <div>
             <h3 className="mb-2 font-semibold">Dátumy</h3>
             <p>Vystavenia: {formatDate(invoice.issueDate)}</p>
@@ -196,28 +213,30 @@ export default function InvoiceDetailPage() {
           </div>
           <div>
             <h3 className="mb-2 font-semibold">Bankový účet</h3>
-            <p>{settings?.iban || '—'}</p>
+            <p className="break-words">{settings?.iban || '—'}</p>
             {settings?.swift && <p>SWIFT/BIC: {settings.swift}</p>}
           </div>
         </div>
       </Card>
 
-      <Card className="mb-6">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Položky</h2>
-        <Table>
-          <THead>
-            <Tr>
-              <Th>Popis</Th>
-              <Th className="text-right">Množstvo</Th>
-              <Th>MJ</Th>
-              <Th className="text-right">Cena/j</Th>
-              <Th className="text-right">DPH %</Th>
-              <Th className="text-right">Základ</Th>
-              <Th className="text-right">DPH</Th>
-              <Th className="text-right">Spolu</Th>
-            </Tr>
-          </THead>
-          <TBody>
+      <Card className="mb-4 sm:mb-6">
+        <CardTitle className="sm:mb-4">Položky</CardTitle>
+        {/* One DOM: a card per item on phones, table columns from md up. */}
+        <div role="table" className="text-sm">
+          <div
+            role="row"
+            className={`hidden border-b border-line pb-3 text-xs font-medium uppercase tracking-wide text-muted md:grid ${ITEM_COLS}`}
+          >
+            <span role="columnheader">Popis</span>
+            <span role="columnheader" className="text-right">Množstvo</span>
+            <span role="columnheader">MJ</span>
+            <span role="columnheader" className="text-right">Cena/j</span>
+            <span role="columnheader" className="text-right">DPH %</span>
+            <span role="columnheader" className="text-right">Základ</span>
+            <span role="columnheader" className="text-right">DPH</span>
+            <span role="columnheader" className="text-right">Spolu</span>
+          </div>
+          <div className="divide-y divide-line">
             {items.map((item) => {
               const t = calcItemTotals({
                 quantity: item.quantity,
@@ -225,29 +244,47 @@ export default function InvoiceDetailPage() {
                 vatRate: item.vatRate,
               });
               return (
-                <Tr key={item.id}>
-                  <Td>{item.description}</Td>
-                  <Td className="text-right">{item.quantity}</Td>
-                  <Td>{item.unit}</Td>
-                  <Td className="text-right">{formatMoney(item.unitPrice, invoice.currency)}</Td>
-                  <Td className="text-right">{item.vatRate} %</Td>
-                  <Td className="text-right">{formatMoney(t.base, invoice.currency)}</Td>
-                  <Td className="text-right">{formatMoney(t.vat, invoice.currency)}</Td>
-                  <Td className="text-right">{formatMoney(t.total, invoice.currency)}</Td>
-                </Tr>
+                <div
+                  key={item.id}
+                  role="row"
+                  className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 py-3 md:items-center md:py-3.5 ${ITEM_COLS}`}
+                >
+                  <span role="cell" className="col-span-2 break-words md:col-span-1">
+                    {item.description}
+                  </span>
+                  <span role="cell" className="text-xs text-muted tabular-nums md:hidden">
+                    {item.quantity} {item.unit} × {formatMoney(item.unitPrice, invoice.currency)}
+                    {item.vatRate > 0 && ` · DPH ${item.vatRate} %`}
+                  </span>
+                  <span role="cell" className="hidden text-right tabular-nums md:block">{item.quantity}</span>
+                  <span role="cell" className="hidden md:block">{item.unit}</span>
+                  <span role="cell" className="hidden text-right tabular-nums md:block">
+                    {formatMoney(item.unitPrice, invoice.currency)}
+                  </span>
+                  <span role="cell" className="hidden text-right tabular-nums md:block">{item.vatRate} %</span>
+                  <span role="cell" className="hidden text-right tabular-nums md:block">
+                    {formatMoney(t.base, invoice.currency)}
+                  </span>
+                  <span role="cell" className="hidden text-right tabular-nums md:block">
+                    {formatMoney(t.vat, invoice.currency)}
+                  </span>
+                  <span role="cell" className="text-right font-medium tabular-nums md:font-normal">
+                    {formatMoney(t.total, invoice.currency)}
+                  </span>
+                </div>
               );
             })}
-          </TBody>
-        </Table>
+          </div>
+        </div>
       </Card>
 
       <Card>
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row">
           {totals.vatSummary.length > 0 && (
-            <div className="w-full max-w-sm text-sm">
-              <table className="w-full">
+            <div className="w-full text-sm sm:max-w-sm">
+              <table className="w-full tabular-nums">
                 <thead>
-                  <tr className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+                  <tr className="text-xs font-medium uppercase tracking-wide text-muted">
                     <th className="py-1 text-left">Sadzba DPH</th>
                     <th className="py-1 text-right">Základ</th>
                     <th className="py-1 text-right">DPH</th>
@@ -267,16 +304,16 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
           )}
-          <div className="ml-auto flex w-full max-w-xs flex-col gap-2 text-sm">
+          <div className="flex w-full flex-col gap-2 text-sm tabular-nums sm:ml-auto sm:max-w-xs">
             <div className="flex justify-between">
-              <span className="text-[#6e6e73]">Základ dane</span>
+              <span className="text-muted">Základ dane</span>
               <span data-testid="totals-base">{formatMoney(totals.base, invoice.currency)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#6e6e73]">DPH</span>
+              <span className="text-muted">DPH</span>
               <span data-testid="totals-vat">{formatMoney(totals.vat, invoice.currency)}</span>
             </div>
-            <div className="flex justify-between border-t border-[#e8e8ed] pt-2 text-base font-semibold">
+            <div className="flex justify-between border-t border-line pt-2 text-base font-semibold">
               <span>Spolu</span>
               <span data-testid="totals-total">{formatMoney(totals.total, invoice.currency)}</span>
             </div>

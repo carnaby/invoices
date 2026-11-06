@@ -1,8 +1,9 @@
 'use client';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { SettingsInput } from '@invoices/shared';
 import { changePasswordSchema } from '@invoices/shared';
-import { Button, Card, Field, Input, Textarea } from '@/components/ui';
+import { Button, Card, Field, Input, Textarea, CardTitle, LogoutIcon } from '@/components/ui';
 import { apiUrl, trpc } from '@/lib/trpc';
 
 type SettingsData = SettingsInput & { hasSmtpPassword: boolean; hasSignature: boolean };
@@ -91,13 +92,22 @@ function buildPayload(form: FormState): SettingsInput {
 function SavedIndicator({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span data-testid="saved-indicator" className="text-sm font-medium text-[#34c759]">
+    <span data-testid="saved-indicator" className="text-sm font-medium text-success">
       Uložené
     </span>
   );
 }
 
 function AccountCard() {
+  const router = useRouter();
+  const utils = trpc.useUtils();
+  const me = trpc.auth.me.useQuery();
+  const logout = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      utils.invalidate();
+      router.replace('/login');
+    },
+  });
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -129,7 +139,25 @@ function AccountCard() {
 
   return (
     <Card>
-      <h2 className="mb-6 text-lg font-semibold tracking-tight">Účet</h2>
+      <CardTitle>Účet</CardTitle>
+      {/* Phones have no sidebar: the account and logout live here. */}
+      {me.data && (
+        <div className="-mt-2 mb-5 flex items-center justify-between gap-3 border-b border-line pb-4 lg:hidden">
+          <span className="min-w-0 truncate text-sm text-muted">
+            Prihlásený ako <span className="font-medium text-ink">{me.data.username}</span>
+          </span>
+          <Button
+            variant="secondary"
+            data-testid="account-logout"
+            className="text-danger"
+            disabled={logout.isPending}
+            onClick={() => logout.mutate()}
+          >
+            <LogoutIcon size={18} />
+            Odhlásiť sa
+          </Button>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Aktuálne heslo" error={errors.currentPassword}>
           <Input
@@ -148,14 +176,14 @@ function AccountCard() {
           />
         </Field>
       </div>
-      <div className="mt-6 flex items-center justify-end gap-3">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-3 sm:mt-6">
         {changed && (
-          <span data-testid="password-changed" className="text-sm font-medium text-[#34c759]">
+          <span data-testid="password-changed" className="text-sm font-medium text-success">
             Heslo bolo zmenené
           </span>
         )}
         {changePassword.isError && (
-          <span data-testid="password-error" className="text-sm text-[#ff3b30]">
+          <span data-testid="password-error" className="text-sm text-danger">
             {changePassword.error.message}
           </span>
         )}
@@ -232,11 +260,11 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-4 sm:space-y-6">
       <AccountCard />
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Dodávateľ</h2>
+        <CardTitle>Dodávateľ</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field label="Názov firmy">
@@ -278,7 +306,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
             </Field>
           </div>
         </div>
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3 sm:mt-6">
           <SavedIndicator show={savedCard === 'supplier'} />
           <Button data-testid="save-supplier" disabled={update.isPending} onClick={() => saveGeneral('supplier')}>
             Uložiť
@@ -287,7 +315,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Banka</h2>
+        <CardTitle>Banka</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="IBAN">
             <Input data-testid="iban" value={form.iban} onChange={set('iban')} />
@@ -296,7 +324,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
             <Input value={form.swift} onChange={set('swift')} />
           </Field>
         </div>
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3 sm:mt-6">
           <SavedIndicator show={savedCard === 'bank'} />
           <Button data-testid="save-bank" disabled={update.isPending} onClick={() => saveGeneral('bank')}>
             Uložiť
@@ -305,7 +333,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Fakturačné predvoľby</h2>
+        <CardTitle>Fakturačné predvoľby</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Predvolená splatnosť (dni)">
             <Input
@@ -331,7 +359,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
             </Field>
           </div>
         </div>
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3 sm:mt-6">
           <SavedIndicator show={savedCard === 'defaults'} />
           <Button data-testid="save-defaults" disabled={update.isPending} onClick={() => saveGeneral('defaults')}>
             Uložiť
@@ -340,7 +368,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">SMTP</h2>
+        <CardTitle>SMTP</CardTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="SMTP server">
             <Input data-testid="smtpHost" value={form.smtpHost} onChange={set('smtpHost')} />
@@ -354,25 +382,25 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
           <Field label="Odosielateľ (e-mail)">
             <Input data-testid="emailFrom" type="email" value={form.emailFrom} onChange={set('emailFrom')} />
           </Field>
-          <label className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink sm:col-span-2">
             <input
               type="checkbox"
               data-testid="smtpSecure"
               checked={form.smtpSecure}
               onChange={(e) => setForm((f) => ({ ...f, smtpSecure: e.target.checked }))}
-              className="h-4 w-4 rounded border-[#e8e8ed] text-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
+              className="h-4 w-4 rounded border-line text-accent focus:ring-2 focus:ring-accent/20"
             />
             Zabezpečené pripojenie (TLS)
           </label>
         </div>
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3 sm:mt-6">
           <SavedIndicator show={savedCard === 'smtp'} />
           <Button data-testid="save-smtp" disabled={update.isPending} onClick={() => saveGeneral('smtp')}>
             Uložiť
           </Button>
         </div>
 
-        <div className="mt-6 border-t border-[#e8e8ed] pt-6">
+        <div className="mt-6 border-t border-line pt-6">
           <Field label="Heslo k SMTP účtu">
             <Input
               data-testid="smtpPassword"
@@ -392,11 +420,11 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
             >
               Uložiť heslo
             </Button>
-            {live.hasSmtpPassword && <span className="text-sm text-[#34c759]">Heslo je uložené</span>}
+            {live.hasSmtpPassword && <span className="text-sm text-success">Heslo je uložené</span>}
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3 border-t border-[#e8e8ed] pt-6">
+        <div className="mt-6 flex items-center gap-3 border-t border-line pt-6">
           <Button
             type="button"
             variant="secondary"
@@ -407,12 +435,12 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
             Test SMTP
           </Button>
           {testSmtp.isSuccess && (
-            <span data-testid="smtp-test-result" className="text-sm text-[#34c759]">
+            <span data-testid="smtp-test-result" className="text-sm text-success">
               Test prebehol úspešne.
             </span>
           )}
           {testSmtp.isError && (
-            <span data-testid="smtp-test-result" className="text-sm text-[#ff3b30]">
+            <span data-testid="smtp-test-result" className="text-sm text-danger">
               {testSmtp.error.message}
             </span>
           )}
@@ -420,7 +448,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Podpis</h2>
+        <CardTitle>Podpis</CardTitle>
         <div className="flex flex-wrap items-center gap-6">
           <div>
             <input
@@ -428,10 +456,10 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
               accept="image/png,image/jpeg"
               data-testid="signature-file"
               onChange={handleFile}
-              className="block text-sm text-[#1d1d1f] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0071e3] file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white file:transition hover:file:bg-[#0077ed]"
+              className="block text-sm text-ink file:mr-4 file:rounded-xl file:border-0 file:bg-accent file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white file:transition hover:file:bg-accent-hover"
             />
             {uploadSignature.isError && (
-              <p data-testid="signature-error" className="mt-2 text-sm text-[#ff3b30]">
+              <p data-testid="signature-error" className="mt-2 text-sm text-danger">
                 {uploadSignature.error.message || 'Nahranie podpisu zlyhalo'}
               </p>
             )}
@@ -453,7 +481,7 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
               data-testid="signature-preview"
               src={`${apiUrl}/files/signature?${cacheBust}`}
               alt="Podpis"
-              className="h-24 rounded-xl border border-[#e8e8ed] bg-white p-2"
+              className="h-24 rounded-xl border border-line bg-surface p-2"
             />
           )}
         </div>

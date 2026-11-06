@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { AppMark } from '@/components/ui';
 import { trpc } from '@/lib/trpc';
 
 export default function LoginPage() {
@@ -12,10 +13,11 @@ export default function LoginPage() {
   const registration = trpc.auth.registrationEnabled.useQuery();
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+    <main className="pt-safe pb-safe flex min-h-dvh items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-card sm:p-8">
+        <AppMark size={48} className="mb-5" />
         <h1 className="mb-1 text-2xl font-semibold tracking-tight">Faktúry</h1>
-        <p className="mb-6 text-sm text-[#6e6e73]">Prihláste sa do svojho účtu</p>
+        <p className="mb-6 text-sm text-muted">Prihláste sa do svojho účtu</p>
         <form
           className="space-y-4"
           onSubmit={(e) => { e.preventDefault(); login.mutate({ username, password }); }}
@@ -23,27 +25,27 @@ export default function LoginPage() {
           <input
             data-testid="username" value={username} onChange={(e) => setUsername(e.target.value)}
             placeholder="Prihlasovacie meno" autoComplete="username"
-            className="w-full rounded-xl border border-[#e8e8ed] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-base outline-none sm:text-sm focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           <input
             data-testid="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             placeholder="Heslo" autoComplete="current-password"
-            className="w-full rounded-xl border border-[#e8e8ed] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-base outline-none sm:text-sm focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           {login.error && (
-            <p data-testid="form-error" className="text-sm text-[#ff3b30]">{login.error.message}</p>
+            <p data-testid="form-error" className="text-sm text-danger">{login.error.message}</p>
           )}
           <button
             data-testid="submit" type="submit" disabled={login.isPending}
-            className="w-full rounded-xl bg-[#0071e3] py-2.5 text-sm font-medium text-white transition hover:bg-[#0077ed] disabled:opacity-50"
+            className="min-h-11 w-full rounded-xl bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-accent-hover disabled:opacity-50"
           >
             Prihlásiť sa
           </button>
         </form>
         {registration.data === true && (
-          <p className="mt-6 text-center text-sm text-[#6e6e73]">
+          <p className="mt-6 text-center text-sm text-muted">
             Nemáte účet?{' '}
-            <Link data-testid="register-link" className="text-[#0071e3] hover:underline" href="/register">
+            <Link data-testid="register-link" className="text-accent hover:underline" href="/register">
               Zaregistrujte sa
             </Link>
           </p>

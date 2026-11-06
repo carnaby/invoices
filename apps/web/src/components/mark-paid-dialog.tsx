@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Button, Field, Input } from '@/components/ui';
+import { Button, Field, Input, Sheet } from '@/components/ui';
 import { round2 } from '@invoices/shared';
 import { formatMoney, todayIso } from '@/lib/format';
 import { trpc } from '@/lib/trpc';
@@ -47,42 +47,11 @@ export function MarkPaidDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
-        <h2 className="text-lg font-semibold tracking-tight">Pridať úhradu</h2>
-        <p data-testid="already-paid" className="mt-2 text-sm text-[#6e6e73]">
-          Už uhradené {formatMoney(paidAmount, currency)} z {formatMoney(total, currency)}
-        </p>
-        <div className="mt-4 space-y-4">
-          <Field label="Prijatá platba">
-            <Input data-testid="paid-amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </Field>
-          {tooHigh && (
-            <p data-testid="paid-amount-error" className="-mt-2 text-xs text-[#ff3b30]">
-              Úhrada presahuje zostávajúcu sumu {formatMoney(remaining, currency)}.
-            </p>
-          )}
-          <Field label="Dátum úhrady">
-            <Input
-              data-testid="paid-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </Field>
-          <Button
-            type="button"
-            variant="secondary"
-            data-testid="pay-full"
-            onClick={() => setAmount(String(remaining))}
-            disabled={remaining <= 0}
-          >
-            {paidAmount > 0 ? 'Doplatiť zvyšok' : 'Uhradiť v plnej výške'}
-          </Button>
-        </div>
-        {remaining <= 0 && <p className="mt-3 text-xs text-[#6e6e73]">Faktúra je už uhradená celá.</p>}
-        {addPayment.error && <p className="mt-3 text-xs text-[#ff3b30]">{addPayment.error.message}</p>}
-        <div className="mt-6 flex justify-end gap-3">
+    <Sheet
+      title="Pridať úhradu"
+      onClose={onClose}
+      footer={
+        <>
           <Button type="button" variant="secondary" data-testid="cancel" onClick={onClose}>
             Zrušiť
           </Button>
@@ -94,8 +63,42 @@ export function MarkPaidDialog({
           >
             Potvrdiť
           </Button>
-        </div>
+        </>
+      }
+    >
+      <p data-testid="already-paid" className="mt-2 text-sm text-muted">
+        Už uhradené {formatMoney(paidAmount, currency)} z {formatMoney(total, currency)}
+      </p>
+      <div className="mt-4 space-y-4">
+        <Field label="Prijatá platba">
+          <Input
+            data-testid="paid-amount"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </Field>
+        {tooHigh && (
+          <p data-testid="paid-amount-error" className="-mt-2 text-xs text-danger">
+            Úhrada presahuje zostávajúcu sumu {formatMoney(remaining, currency)}.
+          </p>
+        )}
+        <Field label="Dátum úhrady">
+          <Input data-testid="paid-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full sm:w-auto"
+          data-testid="pay-full"
+          onClick={() => setAmount(String(remaining))}
+          disabled={remaining <= 0}
+        >
+          {paidAmount > 0 ? 'Doplatiť zvyšok' : 'Uhradiť v plnej výške'}
+        </Button>
       </div>
-    </div>
+      {remaining <= 0 && <p className="mt-3 text-xs text-muted">Faktúra je už uhradená celá.</p>}
+      {addPayment.error && <p className="mt-3 text-xs text-danger">{addPayment.error.message}</p>}
+    </Sheet>
   );
 }

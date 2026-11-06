@@ -3,9 +3,22 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { InvoiceInput } from '@invoices/shared';
 import { calcInvoiceTotals, calcItemTotals, invoiceInputSchema } from '@invoices/shared';
-import { Button, Card, Field, Input, Select, Table, TBody, Td, Th, THead, Tr } from '@/components/ui';
+import { Button, Card, CardTitle, cn, Field, Input, PlusIcon, Select, TrashIcon } from '@/components/ui';
 import { addDays, formatMoney, todayIso } from '@/lib/format';
 import { trpc } from '@/lib/trpc';
+
+const ITEM_COLS =
+  'md:grid-cols-[minmax(0,1fr)_6rem_5rem_7rem_5rem_7.5rem_2.75rem] md:gap-x-3 md:gap-y-0';
+
+/** Item input with a label on phones; from md up the column header names it. */
+function ItemField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={cn('block min-w-0', className)}>
+      <span className="mb-1 block text-xs font-medium text-muted md:sr-only">{label}</span>
+      {children}
+    </label>
+  );
+}
 
 type ItemRow = {
   description: string;
@@ -231,20 +244,20 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Faktúra</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <CardTitle>Faktúra</CardTitle>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <Field label="Číslo faktúry *" error={errors.number}>
             <Input data-testid="number" value={state.number} onChange={set('number')} />
           </Field>
           <Field label="Variabilný symbol" error={errors.variableSymbol}>
-            <Input data-testid="variableSymbol" value={state.variableSymbol} onChange={set('variableSymbol')} />
+            <Input inputMode="numeric" data-testid="variableSymbol" value={state.variableSymbol} onChange={set('variableSymbol')} />
           </Field>
           <Field label="Konštantný symbol" error={errors.constantSymbol}>
-            <Input data-testid="constantSymbol" value={state.constantSymbol} onChange={set('constantSymbol')} />
+            <Input inputMode="numeric" data-testid="constantSymbol" value={state.constantSymbol} onChange={set('constantSymbol')} />
           </Field>
-          <Field label="Kontakt">
+          <Field label="Kontakt" className="col-span-2 max-sm:order-first sm:col-span-1">
             <Select data-testid="contact-select" value={state.contactId ?? ''} onChange={handleContactChange}>
               <option value="">— Bez kontaktu —</option>
               {(contactsQuery.data ?? []).map((c) => (
@@ -270,9 +283,9 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Odberateľ</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
+        <CardTitle>Odberateľ</CardTitle>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="col-span-2">
             <Field label="Názov odberateľa *" error={errors.customerName}>
               <Input data-testid="customerName" value={state.customerName} onChange={set('customerName')} />
             </Field>
@@ -283,10 +296,10 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
           <Field label="IČ DPH" error={errors.customerIcDph}>
             <Input data-testid="customerIcDph" value={state.customerIcDph} onChange={set('customerIcDph')} />
           </Field>
-          <Field label="DIČ" error={errors.customerDic}>
+          <Field label="DIČ" error={errors.customerDic} className="col-span-2 sm:col-span-1">
             <Input data-testid="customerDic" value={state.customerDic} onChange={set('customerDic')} />
           </Field>
-          <Field label="Ulica a číslo" error={errors.customerStreet}>
+          <Field label="Ulica a číslo" error={errors.customerStreet} className="col-span-2 sm:col-span-1">
             <Input data-testid="customerStreet" value={state.customerStreet} onChange={set('customerStreet')} />
           </Field>
           <Field label="PSČ" error={errors.customerZip}>
@@ -295,82 +308,115 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
           <Field label="Mesto" error={errors.customerCity}>
             <Input data-testid="customerCity" value={state.customerCity} onChange={set('customerCity')} />
           </Field>
-          <Field label="Krajina" error={errors.customerCountry}>
+          <Field label="Krajina" error={errors.customerCountry} className="col-span-2 sm:col-span-1">
             <Input data-testid="customerCountry" value={state.customerCountry} onChange={set('customerCountry')} />
           </Field>
-          <Field label="E-mail" error={errors.customerEmail}>
+          <Field label="E-mail" error={errors.customerEmail} className="col-span-2 sm:col-span-1">
             <Input data-testid="customerEmail" type="email" value={state.customerEmail} onChange={set('customerEmail')} />
           </Field>
-          <Field label="Kópia (CC) e-maily, oddelené čiarkou" error={errors.customerCcEmails}>
+          <Field label="Kópia (CC) e-maily, oddelené čiarkou" error={errors.customerCcEmails} className="col-span-2 sm:col-span-1">
             <Input data-testid="customerCcEmails" value={state.customerCcEmails} onChange={set('customerCcEmails')} />
           </Field>
         </div>
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Položky</h2>
-        <Table>
-          <THead>
-            <Tr>
-              <Th>Popis</Th>
-              <Th>Množstvo</Th>
-              <Th>MJ</Th>
-              <Th>Cena/j</Th>
-              <Th>DPH %</Th>
-              <Th className="text-right">Spolu</Th>
-              <Th>{null}</Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {state.items.map((item, idx) => {
-              const rowTotal = calcItemTotals({
-                quantity: parseNum(item.quantity),
-                unitPrice: parseNum(item.unitPrice),
-                vatRate: parseNum(item.vatRate),
-              }).total;
-              return (
-                <Tr key={idx}>
-                  <Td className="min-w-[200px]">
-                    <Input data-testid={`item-desc-${idx}`} value={item.description} onChange={updateItem(idx, 'description')} />
-                  </Td>
-                  <Td className="w-24">
-                    <Input data-testid={`item-qty-${idx}`} value={item.quantity} onChange={updateItem(idx, 'quantity')} />
-                  </Td>
-                  <Td className="w-20">
-                    <Input data-testid={`item-unit-${idx}`} value={item.unit} onChange={updateItem(idx, 'unit')} />
-                  </Td>
-                  <Td className="w-28">
-                    <Input data-testid={`item-price-${idx}`} value={item.unitPrice} onChange={updateItem(idx, 'unitPrice')} />
-                  </Td>
-                  <Td className="w-20">
-                    <Input data-testid={`item-vat-${idx}`} value={item.vatRate} onChange={updateItem(idx, 'vatRate')} />
-                  </Td>
-                  <Td className="text-right" data-testid={`item-total-${idx}`}>
+        <CardTitle>Položky</CardTitle>
+        <div
+          className={cn(
+            'hidden border-b border-line pb-3 text-xs font-medium uppercase tracking-wide text-muted md:grid',
+            ITEM_COLS,
+          )}
+        >
+          <span>Popis</span>
+          <span>Množstvo</span>
+          <span>MJ</span>
+          <span>Cena/j</span>
+          <span>DPH %</span>
+          <span className="text-right">Spolu</span>
+          <span />
+        </div>
+        {/* One DOM: a boxed card per item on phones, a table row from md up. */}
+        <div className="space-y-3 md:space-y-0 md:divide-y md:divide-line">
+          {state.items.map((item, idx) => {
+            const rowTotal = calcItemTotals({
+              quantity: parseNum(item.quantity),
+              unitPrice: parseNum(item.unitPrice),
+              vatRate: parseNum(item.vatRate),
+            }).total;
+            return (
+              <div
+                key={idx}
+                className={cn(
+                  'grid grid-cols-2 gap-3 rounded-xl bg-canvas p-3 md:items-center md:rounded-none md:bg-transparent md:px-0 md:py-3',
+                  ITEM_COLS,
+                )}
+              >
+                <ItemField label="Popis" className="col-span-2 md:col-span-1">
+                  <Input data-testid={`item-desc-${idx}`} value={item.description} onChange={updateItem(idx, 'description')} />
+                </ItemField>
+                <ItemField label="Množstvo">
+                  <Input
+                    data-testid={`item-qty-${idx}`}
+                    inputMode="decimal"
+                    value={item.quantity}
+                    onChange={updateItem(idx, 'quantity')}
+                  />
+                </ItemField>
+                <ItemField label="MJ">
+                  <Input data-testid={`item-unit-${idx}`} value={item.unit} onChange={updateItem(idx, 'unit')} />
+                </ItemField>
+                <ItemField label="Cena/j">
+                  <Input
+                    data-testid={`item-price-${idx}`}
+                    inputMode="decimal"
+                    value={item.unitPrice}
+                    onChange={updateItem(idx, 'unitPrice')}
+                  />
+                </ItemField>
+                <ItemField label="DPH %">
+                  <Input
+                    data-testid={`item-vat-${idx}`}
+                    inputMode="decimal"
+                    value={item.vatRate}
+                    onChange={updateItem(idx, 'vatRate')}
+                  />
+                </ItemField>
+                <div className="flex items-center justify-between gap-2 md:contents">
+                  <span className="text-sm tabular-nums md:text-right" data-testid={`item-total-${idx}`}>
+                    <span className="text-muted md:hidden">Spolu </span>
                     {formatMoney(rowTotal, state.currency)}
-                  </Td>
-                  <Td>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      data-testid={`item-remove-${idx}`}
-                      onClick={() => removeItem(idx)}
-                    >
-                      ×
-                    </Button>
-                  </Td>
-                </Tr>
-              );
-            })}
-          </TBody>
-        </Table>
-        {errors.items && <p className="mt-3 text-xs text-[#ff3b30]">{errors.items}</p>}
-        <Button type="button" variant="secondary" className="mt-4" data-testid="add-item" onClick={addItem}>
-          + Pridať položku
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label="Odstrániť položku"
+                    className="px-3 text-subtle hover:text-danger"
+                    data-testid={`item-remove-${idx}`}
+                    onClick={() => removeItem(idx)}
+                  >
+                    <TrashIcon size={18} />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {errors.items && <p className="mt-3 text-xs text-danger">{errors.items}</p>}
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-4 w-full sm:w-auto"
+          data-testid="add-item"
+          onClick={addItem}
+        >
+          <PlusIcon size={18} />
+          Pridať položku
         </Button>
       </Card>
 
       <Card>
-        <h2 className="mb-6 text-lg font-semibold tracking-tight">Poznámky</h2>
+        <CardTitle>Poznámky</CardTitle>
         <div className="grid grid-cols-1 gap-4">
           <Field label="Úvodný text" error={errors.introText}>
             <Input data-testid="introText" value={state.introText} onChange={set('introText')} />
@@ -382,16 +428,16 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
       </Card>
 
       <Card>
-        <div className="ml-auto flex w-full max-w-xs flex-col gap-2 text-sm">
+        <div className="flex w-full flex-col gap-2 text-sm tabular-nums sm:ml-auto sm:max-w-xs">
           <div className="flex justify-between">
-            <span className="text-[#6e6e73]">Základ dane</span>
+            <span className="text-muted">Základ dane</span>
             <span data-testid="totals-base">{formatMoney(totals.base, state.currency)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[#6e6e73]">DPH</span>
+            <span className="text-muted">DPH</span>
             <span data-testid="totals-vat">{formatMoney(totals.vat, state.currency)}</span>
           </div>
-          <div className="flex justify-between border-t border-[#e8e8ed] pt-2 text-base font-semibold">
+          <div className="flex justify-between border-t border-line pt-2 text-base font-semibold">
             <span>Spolu</span>
             <span data-testid="totals-total">{formatMoney(totals.total, state.currency)}</span>
           </div>
@@ -399,12 +445,12 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
       </Card>
 
       {serverError && (
-        <p data-testid="form-error" className="text-sm text-[#ff3b30]">
+        <p data-testid="form-error" className="text-sm text-danger">
           {serverError.message}
         </p>
       )}
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
         <Button type="button" variant="secondary" onClick={() => router.push('/invoices')}>
           Zrušiť
         </Button>
