@@ -37,7 +37,7 @@ export default function InvoiceDetailPage() {
 
   if (query.isLoading || !query.data) return null;
 
-  const { invoice, items, totals } = query.data;
+  const { invoice, items, totals, locked, hasOriginal } = query.data;
   const settings = settingsQuery.data;
   const status = derivePaymentStatus(totals.total, invoice.paidAmount);
   const overdue = isOverdue(invoice.dueDate, status, todayIso());
@@ -57,28 +57,52 @@ export default function InvoiceDetailPage() {
             >
               Stiahnuť PDF
             </a>
+            {hasOriginal && (
+              <a
+                data-testid="download-original"
+                href={`${apiUrl}/files/invoices/${id}/original`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-xl border border-[#e8e8ed] bg-white px-4 py-2.5 text-sm font-medium text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+              >
+                Originál z iDokladu
+              </a>
+            )}
             <Button variant="secondary" data-testid="send-email" onClick={() => setDialog('sendEmail')}>
               Odoslať e-mailom
             </Button>
             <Button variant="secondary" data-testid="mark-paid" onClick={() => setDialog('markPaid')}>
               Označiť úhradu
             </Button>
-            <Link
-              href={`/invoices/${id}/edit`}
-              data-testid="edit-invoice"
-              className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0077ed]"
-            >
-              Upraviť
-            </Link>
-            <Button variant="danger" data-testid="delete-invoice" onClick={() => setDialog('delete')}>
-              Zmazať
-            </Button>
+            {!locked && (
+              <>
+                <Link
+                  href={`/invoices/${id}/edit`}
+                  data-testid="edit-invoice"
+                  className="inline-flex items-center justify-center rounded-xl bg-[#0071e3] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0077ed]"
+                >
+                  Upraviť
+                </Link>
+                <Button variant="danger" data-testid="delete-invoice" onClick={() => setDialog('delete')}>
+                  Zmazať
+                </Button>
+              </>
+            )}
           </div>
         }
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <StatusBadge status={status} overdue={overdue} />
+        {locked && (
+          <span
+            data-testid="locked-badge"
+            title="Faktúra bola prenesená z iDokladu a nedá sa meniť ani zmazať. Úhrady sa zapisujú ďalej."
+            className="inline-flex items-center rounded-full bg-[#86868b]/15 px-2.5 py-0.5 text-xs font-medium text-[#1d1d1f]"
+          >
+            Uzamknutá · z iDokladu
+          </span>
+        )}
         {status !== 'unpaid' && (
           <span data-testid="paid-info" className="text-sm text-[#6e6e73]">
             {status === 'paid'

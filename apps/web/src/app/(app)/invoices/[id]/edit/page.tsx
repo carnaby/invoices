@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { InvoiceInput } from '@invoices/shared';
 import { InvoiceForm } from '@/components/invoice-form';
@@ -11,6 +12,20 @@ export default function EditInvoicePage() {
   const query = trpc.invoices.get.useQuery({ id });
 
   if (query.isLoading || !query.data) return null;
+
+  if (query.data.locked) {
+    return (
+      <div>
+        <PageHeader title={`Faktúra ${query.data.invoice.number}`} />
+        <p data-testid="locked-message" className="text-sm text-[#1d1d1f]">
+          Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.{' '}
+          <Link href={`/invoices/${id}`} className="text-[#0071e3] hover:underline">
+            Späť na faktúru
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   const { invoice, items } = query.data;
   const initial: InvoiceInput = {
