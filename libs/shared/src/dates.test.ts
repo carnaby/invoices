@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { todayIso } from './dates';
 
 describe('todayIso', () => {
@@ -16,5 +16,13 @@ describe('todayIso', () => {
 
   it('defaults to now and returns YYYY-MM-DD', () => {
     expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('does not depend on how the runtime formats en-CA dates', () => {
+    // Some browser versions shipped en-CA locale data as M/D/YYYY.
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'format', 'get').mockReturnValue(() => '1/15/2026');
+    expect(todayIso(new Date('2026-01-14T23:30:00Z'))).toBe('2026-01-15');
   });
 });
