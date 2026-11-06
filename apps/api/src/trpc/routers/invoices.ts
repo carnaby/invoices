@@ -172,7 +172,7 @@ export const invoicesRouter = router({
       await tx
         .update(invoices)
         .set({
-          paidAmount: input.paidAmount,
+          paidAmount: round2(input.paidAmount),
           paidDate: input.paidDate ?? (input.paidAmount > 0 ? todayIso() : null),
           updatedAt: new Date(),
         })

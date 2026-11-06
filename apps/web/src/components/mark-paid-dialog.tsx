@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Button, Field, Input } from '@/components/ui';
+import { round2 } from '@invoices/shared';
 import { formatMoney, todayIso } from '@/lib/format';
 import { trpc } from '@/lib/trpc';
 
@@ -38,7 +39,7 @@ export function MarkPaidDialog({
 
   const value = parseAmount(amount);
   // Same rule as the API: a payment cannot exceed what is left to pay.
-  const tooHigh = Math.round(value * 100) > Math.round(remaining * 100);
+  const tooHigh = Math.round(round2(value) * 100) > Math.round(remaining * 100);
   const handleConfirm = () => {
     addPayment.mutate({ id: invoiceId, amount: value, paidDate: date || undefined });
   };

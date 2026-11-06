@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { invoiceItems, invoiceOriginals, invoices, type Db, type DbTx } from '@invoices/db';
-import { calcInvoiceTotals, type InvoiceTotals } from '@invoices/shared';
+import { calcInvoiceTotals, round2, type InvoiceTotals } from '@invoices/shared';
 
 export { todayIso } from '@invoices/shared';
 
@@ -56,7 +56,8 @@ export async function loadOriginal(db: Db, userId: string, invoiceId: string) {
   return row ?? null;
 }
 
-const toCents = (n: number) => Math.round(n * 100);
+// Rounds like the stored value (round2, half away from zero) so 1.005 is checked as 1.01, as it will be saved.
+const toCents = (n: number) => Math.round(round2(n) * 100);
 const formatCents = (cents: number, currency: string) =>
   `${(Math.max(0, cents) / 100).toFixed(2).replace('.', ',')} ${currency}`;
 

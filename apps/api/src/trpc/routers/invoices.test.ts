@@ -111,6 +111,15 @@ describe('invoices', () => {
     await expect(caller.invoices.addPayment({ id, amount: 0.01 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
+  it('half-cent amounts are rounded before the check, so they cannot overpay by a cent', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    await caller.invoices.addPayment({ id, amount: 289 });
+    await expect(caller.invoices.addPayment({ id, amount: 1.005 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.invoices.markPaid({ id, paidAmount: 290.005 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(289);
+  });
+
   it('addPayment: two payments at once cannot together exceed the total', async () => {
     const caller = await newUserCaller('jozef');
     const { id } = await caller.invoices.create(baseInvoice); // total 290
