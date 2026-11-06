@@ -13,16 +13,27 @@ test('locked iDoklad invoice: no edit or delete, both PDFs download, payments st
   await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
   const id = page.url().split('/').pop()!;
 
-  // A form opened before the lock must show the Slovak lock message on save.
+  // A form and a detail opened before the lock must show the Slovak lock message on save and delete.
   const stale = await page.context().newPage();
   await stale.goto(`/invoices/${id}/edit`);
   await expect(stale.getByTestId('save')).toBeVisible();
+  const staleDetail = await page.context().newPage();
+  await staleDetail.goto(`/invoices/${id}`);
+  await expect(staleDetail.getByTestId('delete-invoice')).toBeVisible();
 
   await lockWithOriginal(id, Buffer.from('%PDF-1.4 e2e original'), 'faktura-e2e.pdf');
 
   await stale.getByTestId('save').click();
   await expect(stale.getByText('Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.')).toBeVisible();
   await stale.close();
+
+  await staleDetail.getByTestId('delete-invoice').click();
+  await staleDetail.getByTestId('confirm').click();
+  await expect(staleDetail.getByTestId('confirm-error')).toContainText(
+    'Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.',
+  );
+  await expect(staleDetail).toHaveURL(new RegExp(`/invoices/${id}$`));
+  await staleDetail.close();
 
   await page.reload();
   await expect(page.getByTestId('locked-badge')).toContainText('Uzamknutá');
@@ -110,6 +121,11 @@ test('partial payments add up and the second one prefills the remaining amount',
   await page.getByTestId('mark-paid').click();
   await expect(page.getByTestId('already-paid')).toContainText('50,00');
   await expect(page.getByTestId('paid-amount')).toHaveValue('70');
+  await page.getByTestId('paid-amount').fill('70,01');
+  await expect(page.getByTestId('paid-amount-error')).toContainText('Úhrada presahuje zostávajúcu sumu 70,00');
+  await expect(page.getByTestId('confirm')).toBeDisabled();
+  await page.getByTestId('paid-amount').fill('70');
+  await expect(page.getByTestId('paid-amount-error')).toHaveCount(0);
   await page.getByTestId('confirm').click();
   await expect(page.getByText('Uhradená', { exact: true })).toBeVisible();
 });

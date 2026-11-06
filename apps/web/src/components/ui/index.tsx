@@ -239,6 +239,7 @@ export function ConfirmDialog({
   confirmLabel = 'Potvrdiť',
   onConfirm,
   onCancel,
+  error,
 }: {
   open: boolean;
   title: string;
@@ -246,6 +247,7 @@ export function ConfirmDialog({
   confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  error?: string;
 }) {
   if (!open) return null;
   return (
@@ -253,6 +255,11 @@ export function ConfirmDialog({
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         {description && <p className="mt-2 text-sm text-[#6e6e73]">{description}</p>}
+        {error && (
+          <p data-testid="confirm-error" className="mt-3 text-xs text-[#ff3b30]">
+            {error}
+          </p>
+        )}
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" data-testid="cancel" onClick={onCancel}>
             Zrušiť

@@ -283,7 +283,11 @@ export default function InvoiceDetailPage() {
         description={`Faktúra ${invoice.number} bude natrvalo odstránená.`}
         confirmLabel="Zmazať"
         onConfirm={() => remove.mutate({ id })}
-        onCancel={() => setDialog('none')}
+        onCancel={() => {
+          remove.reset();
+          setDialog('none');
+        }}
+        error={remove.error?.message}
       />
     </div>
   );
