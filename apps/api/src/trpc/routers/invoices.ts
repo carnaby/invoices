@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { invoiceItems, invoices, settings } from '@invoices/db';
 import {
@@ -7,7 +7,7 @@ import {
   markPaidSchema, round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
-import { invoiceNotFound, loadInvoiceWithItems, todayIso } from '../../invoices/invoices.service';
+import { invoiceNotFound, loadInvoiceWithItems, throwMissingOrLocked, todayIso } from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
 import { generateInvoicePdf } from '../../pdf/pdf.service';
 import { env } from '../../env';
@@ -66,9 +66,9 @@ export const invoicesRouter = router({
           const [updated] = await tx
             .update(invoices)
             .set({ ...invoice, updatedAt: new Date() })
-            .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
+            .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId), isNull(invoices.lockedAt)))
             .returning({ id: invoices.id });
-          if (!updated) throw invoiceNotFound();
+          if (!updated) await throwMissingOrLocked(ctx.db, ctx.userId, input.id);
           await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, input.id));
           await tx.insert(invoiceItems).values(
             items.map((item, i) => ({ ...item, invoiceId: input.id, position: i + 1 })),
@@ -157,9 +157,9 @@ export const invoicesRouter = router({
   remove: authedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
     const deleted = await ctx.db
       .delete(invoices)
-      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
+      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId), isNull(invoices.lockedAt)))
       .returning({ id: invoices.id });
-    if (deleted.length === 0) throw invoiceNotFound();
+    if (deleted.length === 0) await throwMissingOrLocked(ctx.db, ctx.userId, input.id);
     return { ok: true };
   }),
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import { createTestDb, truncateAll } from '@invoices/db/src/testing';
-import type { Db } from '@invoices/db';
+import { eq } from 'drizzle-orm';
+import { invoiceOriginals, invoices, type Db } from '@invoices/db';
 import { createTestContext } from '../context';
 import { createCaller } from '../app-router';
 import { todayIso } from '../../invoices/invoices.service';
@@ -165,5 +166,74 @@ describe('invoices', () => {
     await expect(b.invoices.addPayment({ id, amount: 1 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await a.invoices.get({ id })).invoice.paidAmount).toBe(0);
     await expect(b.invoices.remove({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+async function lock(id: string) {
+  await db.update(invoices).set({ lockedAt: new Date() }).where(eq(invoices.id, id));
+}
+
+describe('locked invoices (imported from iDoklad)', () => {
+  it('update and remove are FORBIDDEN and change nothing, items included', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await lock(id);
+
+    const changed = {
+      ...baseInvoice,
+      customerName: 'Zmenené s.r.o.',
+      items: [{ description: 'Iné', quantity: 1, unitPrice: 1, vatRate: 0 }],
+    };
+    await expect(caller.invoices.update({ id, data: changed })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Faktúra z iDokladu je uzamknutá a nedá sa meniť ani zmazať.',
+    });
+    await expect(caller.invoices.remove({ id })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const { invoice, items } = await caller.invoices.get({ id });
+    expect(invoice.customerName).toBe('Test s.r.o.');
+    expect(items.map((i) => i.description)).toEqual(['Programátorské práce', 'Konzultácie']);
+  });
+
+  it('another user gets NOT_FOUND, not FORBIDDEN, for a locked invoice', async () => {
+    const owner = await newUserCaller('jozef');
+    const { id } = await owner.invoices.create(baseInvoice);
+    await lock(id);
+    const other = await newUserCaller('cudzi');
+    await expect(other.invoices.remove({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(other.invoices.update({ id, data: baseInvoice })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('payments still work on a locked invoice', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await lock(id);
+    await caller.invoices.addPayment({ id, amount: 100, paidDate: '2026-12-01' });
+    await caller.invoices.addPayment({ id, amount: 90, paidDate: '2026-12-15' });
+    const { invoice } = await caller.invoices.get({ id });
+    expect(invoice.paidAmount).toBe(190);
+    expect(invoice.paidDate).toBe('2026-12-15');
+    await caller.invoices.markPaid({ id, paidAmount: 290, paidDate: '2026-12-20' });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(290);
+  });
+
+  it('get reports locked and hasOriginal', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    expect(await caller.invoices.get({ id })).toMatchObject({ locked: false, hasOriginal: false });
+
+    await lock(id);
+    await db.insert(invoiceOriginals).values({
+      invoiceId: id, pdf: Buffer.from('%PDF-1.4 x'), fileName: 'faktura-20260001.pdf',
+    });
+    expect(await caller.invoices.get({ id })).toMatchObject({ locked: true, hasOriginal: true });
+  });
+
+  it('unlocked invoices can still be updated and removed', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await caller.invoices.update({ id, data: { ...baseInvoice, customerName: 'Nové s.r.o.' } });
+    expect((await caller.invoices.get({ id })).invoice.customerName).toBe('Nové s.r.o.');
+    await expect(caller.invoices.remove({ id })).resolves.toEqual({ ok: true });
   });
 });
