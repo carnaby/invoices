@@ -1,11 +1,17 @@
+import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { users } from '@invoices/db';
 import { changePasswordSchema, loginSchema, registerSchema } from '@invoices/shared';
 import { authedProcedure, publicProcedure, router } from '../trpc';
+import { isRegistrationEnabled } from '../../env';
 import { changeUserPassword, createSession, destroySession, registerUser, verifyCredentials } from '../../auth/auth.service';
 
 export const authRouter = router({
+  registrationEnabled: publicProcedure.query(() => isRegistrationEnabled()),
   register: publicProcedure.input(registerSchema).mutation(async ({ ctx, input }) => {
+    if (!isRegistrationEnabled()) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Registrácia nových účtov je vypnutá.' });
+    }
     const user = await registerUser(ctx.db, input);
     ctx.setSessionCookie(await createSession(ctx.db, user.id));
     return user;

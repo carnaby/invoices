@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, truncateAll } from '@invoices/db/src/testing';
 import { settings, users } from '@invoices/db';
 import { createTestContext, resolveUserId } from '../context';
@@ -104,5 +104,35 @@ describe('auth.changePassword', () => {
 
     await expect(resolveUserId(db, tokenA)).resolves.toBe(ctx.userId);
     await expect(resolveUserId(db, tokenB)).resolves.toBeNull();
+  });
+});
+
+describe('registration toggle', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('is closed in production unless REGISTRATION_ENABLED=true', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('REGISTRATION_ENABLED', '');
+    const caller = createCaller(createTestContext(db));
+    await expect(caller.auth.registrationEnabled()).resolves.toBe(false);
+    await expect(caller.auth.register({ username: 'stranger', password: 'password123' }))
+      .rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await db.select().from(users)).toHaveLength(0);
+
+    vi.stubEnv('REGISTRATION_ENABLED', 'true');
+    await expect(caller.auth.registrationEnabled()).resolves.toBe(true);
+    await expect(caller.auth.register({ username: 'owner', password: 'password123' })).resolves.toBeTruthy();
+  });
+
+  it('is open outside production unless REGISTRATION_ENABLED=false', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('REGISTRATION_ENABLED', '');
+    const caller = createCaller(createTestContext(db));
+    await expect(caller.auth.registrationEnabled()).resolves.toBe(true);
+
+    vi.stubEnv('REGISTRATION_ENABLED', 'false');
+    await expect(caller.auth.registrationEnabled()).resolves.toBe(false);
+    await expect(caller.auth.register({ username: 'dev', password: 'password123' }))
+      .rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

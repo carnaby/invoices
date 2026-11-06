@@ -16,6 +16,17 @@ if (isProduction && (!appSecret || appSecret.length < 32)) {
   process.exit(1);
 }
 
+/**
+ * New accounts are closed in production (a public subdomain) and open in dev and tests.
+ * REGISTRATION_ENABLED=true/false overrides either default. Read on every call so tests can change it.
+ */
+export function isRegistrationEnabled(): boolean {
+  const flag = process.env.REGISTRATION_ENABLED?.trim().toLowerCase();
+  if (flag === 'true') return true;
+  if (flag === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
 export const env = {
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://invoices:invoices@localhost:5432/invoices',
   appSecret: appSecret ?? 'dev-secret-do-not-use-in-prod-0000000000000000',

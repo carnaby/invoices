@@ -9,6 +9,22 @@ export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const register = trpc.auth.register.useMutation({ onSuccess: () => router.push('/dashboard') });
+  const registration = trpc.auth.registrationEnabled.useQuery();
+
+  if (registration.data === false) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <div
+          data-testid="registration-closed"
+          className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+        >
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight">Registrácia je vypnutá</h1>
+          <p className="mb-6 text-sm text-[#6e6e73]">Nové účty sa na tejto inštancii nedajú vytvoriť.</p>
+          <Link className="text-sm text-[#0071e3] hover:underline" href="/login">Prihlásiť sa</Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">

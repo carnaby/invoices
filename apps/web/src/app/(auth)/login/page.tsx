@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const login = trpc.auth.login.useMutation({ onSuccess: () => router.push('/dashboard') });
+  const registration = trpc.auth.registrationEnabled.useQuery();
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
@@ -39,10 +40,14 @@ export default function LoginPage() {
             Prihlásiť sa
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-[#6e6e73]">
-          Nemáte účet?{' '}
-          <Link className="text-[#0071e3] hover:underline" href="/register">Zaregistrujte sa</Link>
-        </p>
+        {registration.data === true && (
+          <p className="mt-6 text-center text-sm text-[#6e6e73]">
+            Nemáte účet?{' '}
+            <Link data-testid="register-link" className="text-[#0071e3] hover:underline" href="/register">
+              Zaregistrujte sa
+            </Link>
+          </p>
+        )}
       </div>
     </main>
   );
