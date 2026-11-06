@@ -3,10 +3,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { invoiceItems, invoiceOriginals, invoices, type Db } from '@invoices/db';
 import { calcInvoiceTotals, type InvoiceTotals } from '@invoices/shared';
 
-export function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+export { todayIso } from '@invoices/shared';
 
 export const invoiceNotFound = () => new TRPCError({ code: 'NOT_FOUND', message: 'Faktúra neexistuje' });
 
