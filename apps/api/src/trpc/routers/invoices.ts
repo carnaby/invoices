@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { invoiceItems, invoices, settings } from '@invoices/db';
 import {
@@ -8,8 +8,8 @@ import {
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import {
-  checkAddedPayment, checkPaidAmount, loadInvoiceWithItems, loadOriginal,
-  throwMissingOrLocked, todayIso,
+  checkAddedPayment, checkNewTotal, checkPaidAmount, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
+  lockForEdit, todayIso,
 } from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
 import { generateInvoicePdf } from '../../pdf/pdf.service';
@@ -66,12 +66,12 @@ export const invoicesRouter = router({
       const { invoice, items } = invoiceValues(ctx.userId, input.data);
       try {
         return await ctx.db.transaction(async (tx) => {
-          const [updated] = await tx
+          const current = await lockForEdit(tx, ctx.userId, input.id);
+          checkNewTotal(current, calcInvoiceTotals(items).total);
+          await tx
             .update(invoices)
             .set({ ...invoice, updatedAt: new Date() })
-            .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId), isNull(invoices.lockedAt)))
-            .returning({ id: invoices.id });
-          if (!updated) await throwMissingOrLocked(tx, ctx.userId, input.id);
+            .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
           await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, input.id));
           await tx.insert(invoiceItems).values(
             items.map((item, i) => ({ ...item, invoiceId: input.id, position: i + 1 })),
@@ -157,13 +157,23 @@ export const invoicesRouter = router({
       };
     }),
 
-  remove: authedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
-    const deleted = await ctx.db
-      .delete(invoices)
-      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId), isNull(invoices.lockedAt)))
+  remove: authedProcedure.input(idInput).mutation(({ ctx, input }) =>
+    ctx.db.transaction(async (tx) => {
+      await lockForEdit(tx, ctx.userId, input.id);
+      await tx.delete(invoices).where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
+      return { ok: true };
+    }),
+  ),
+
+  // Undoes mistyped payments; this also unlocks an invoice that was locked only because it was paid.
+  resetPayments: authedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
+    const [updated] = await ctx.db
+      .update(invoices)
+      .set({ paidAmount: 0, paidDate: null, updatedAt: new Date() })
+      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
       .returning({ id: invoices.id });
-    if (deleted.length === 0) await throwMissingOrLocked(ctx.db, ctx.userId, input.id);
-    return { ok: true };
+    if (!updated) throw invoiceNotFound();
+    return { id: updated.id };
   }),
 
   markPaid: authedProcedure.input(markPaidSchema).mutation(({ ctx, input }) =>

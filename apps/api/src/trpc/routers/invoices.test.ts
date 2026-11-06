@@ -5,6 +5,7 @@ import { createDb, invoiceOriginals, invoices, type Db } from '@invoices/db';
 import { createTestContext } from '../context';
 import { createCaller } from '../app-router';
 import { todayIso } from '../../invoices/invoices.service';
+import { formatMoney } from '@invoices/shared';
 
 let db: Db; let close: () => Promise<void>;
 beforeAll(async () => { const t = await createTestDb(); db = t.db; close = t.close; });
@@ -103,7 +104,7 @@ describe('invoices', () => {
     await caller.invoices.addPayment({ id, amount: 100 });
     await expect(caller.invoices.addPayment({ id, amount: 190.01 })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'Úhrada presahuje zostávajúcu sumu 190,00 EUR.',
+      message: `Úhrada presahuje zostávajúcu sumu ${formatMoney(190)}.`,
     });
     expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(100);
     await caller.invoices.addPayment({ id, amount: 190 });
@@ -136,7 +137,7 @@ describe('invoices', () => {
     const { id } = await caller.invoices.create(baseInvoice); // total 290
     await expect(caller.invoices.markPaid({ id, paidAmount: 290.01 })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'Úhrada presahuje sumu faktúry 290,00 EUR.',
+      message: `Úhrada presahuje sumu faktúry ${formatMoney(290)}.`,
     });
     expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(0);
   });
@@ -295,5 +296,90 @@ describe('locked invoices (imported from iDoklad)', () => {
     await caller.invoices.update({ id, data: { ...baseInvoice, customerName: 'Nové s.r.o.' } });
     expect((await caller.invoices.get({ id })).invoice.customerName).toBe('Nové s.r.o.');
     await expect(caller.invoices.remove({ id })).resolves.toEqual({ ok: true });
+  });
+});
+
+const PAID_LOCKED = 'Uhradená faktúra je uzamknutá a nedá sa meniť ani zmazať.';
+
+describe('paid invoices are locked', () => {
+  it('a fully paid invoice cannot be updated or removed and get reports the reason', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    await caller.invoices.addPayment({ id, amount: 290 });
+    await expect(caller.invoices.update({ id, data: { ...baseInvoice, customerName: 'Iná' } })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: PAID_LOCKED,
+    });
+    await expect(caller.invoices.remove({ id })).rejects.toMatchObject({ code: 'FORBIDDEN', message: PAID_LOCKED });
+    const got = await caller.invoices.get({ id });
+    expect(got.invoice.customerName).toBe('Test s.r.o.');
+    expect(got).toMatchObject({ locked: true, lockReason: 'paid' });
+  });
+
+  it('a partially paid invoice can be edited, but its total cannot drop below the paid amount', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await caller.invoices.addPayment({ id, amount: 100 });
+    expect(await caller.invoices.get({ id })).toMatchObject({ locked: false, lockReason: null });
+
+    const items = (unitPrice: number) => [{ description: 'X', quantity: 1, unitPrice, vatRate: 0 }];
+    await expect(caller.invoices.update({ id, data: { ...baseInvoice, items: items(99.99) } })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: `Suma faktúry nemôže byť nižšia ako už uhradených ${formatMoney(100)}.`,
+    });
+    expect((await caller.invoices.get({ id })).totals.total).toBe(290);
+
+    await caller.invoices.update({ id, data: { ...baseInvoice, items: items(150) } });
+    expect((await caller.invoices.get({ id })).totals.total).toBe(150);
+  });
+
+  it('an invoice with a zero total is not locked', async () => {
+    const caller = await newUserCaller('jozef');
+    const zero = { ...baseInvoice, items: [{ description: 'Zadarmo', quantity: 1, unitPrice: 0, vatRate: 0 }] };
+    const { id } = await caller.invoices.create(zero);
+    expect(await caller.invoices.get({ id })).toMatchObject({ locked: false, lockReason: null });
+    await caller.invoices.update({ id, data: { ...zero, customerName: 'Iná' } });
+    await caller.invoices.remove({ id });
+  });
+
+  it('the iDoklad reason wins when an imported invoice is also paid', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await lock(id);
+    await caller.invoices.addPayment({ id, amount: 290 });
+    expect(await caller.invoices.get({ id })).toMatchObject({ locked: true, lockReason: 'idoklad' });
+  });
+
+  it('resetPayments clears the paid amount and date and unlocks a paid invoice', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await caller.invoices.addPayment({ id, amount: 290, paidDate: '2026-02-01' });
+    await caller.invoices.resetPayments({ id });
+    const got = await caller.invoices.get({ id });
+    expect(got.invoice).toMatchObject({ paidAmount: 0, paidDate: null });
+    expect(got).toMatchObject({ locked: false, lockReason: null });
+    await caller.invoices.remove({ id });
+  });
+
+  it('resetPayments keeps the iDoklad lock and is NOT_FOUND for another user', async () => {
+    const owner = await newUserCaller('jozef');
+    const { id } = await owner.invoices.create(baseInvoice);
+    await lock(id);
+    await owner.invoices.addPayment({ id, amount: 100 });
+    const other = await newUserCaller('cudzi');
+    await expect(other.invoices.resetPayments({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await owner.invoices.get({ id })).invoice.paidAmount).toBe(100);
+    await owner.invoices.resetPayments({ id });
+    expect(await owner.invoices.get({ id })).toMatchObject({ locked: true, lockReason: 'idoklad' });
+    expect((await owner.invoices.get({ id })).invoice.paidAmount).toBe(0);
+  });
+
+  it('markPaid can always set the paid amount to 0, even for a negative total', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create({
+      ...baseInvoice, items: [{ description: 'Dobropis', quantity: 1, unitPrice: -50, vatRate: 0 }],
+    });
+    await caller.invoices.markPaid({ id, paidAmount: 0 });
+    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(0);
   });
 });
