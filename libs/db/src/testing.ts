@@ -13,6 +13,6 @@ export async function createTestDb() {
 
 export async function truncateAll(db: Db) {
   await db.execute(
-    sql`TRUNCATE TABLE invoice_items, invoices, contacts, sessions, settings, users CASCADE`,
+    sql`TRUNCATE TABLE invoice_originals, invoice_items, invoices, contacts, sessions, settings, users CASCADE`,
   );
 }

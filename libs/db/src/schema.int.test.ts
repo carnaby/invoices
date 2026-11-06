@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, truncateAll } from './testing';
-import { users, contacts, invoices, invoiceItems, settings } from './schema';
+import { eq } from 'drizzle-orm';
+import { users, contacts, invoices, invoiceItems, invoiceOriginals, settings } from './schema';
 import type { Db } from './client';
 
 let db: Db;
@@ -56,5 +57,26 @@ describe('schema', () => {
     };
     await db.insert(invoices).values(base);
     await expect(db.insert(invoices).values(base)).rejects.toThrow();
+  });
+
+  it('stores an original PDF per invoice and deletes it with the invoice; locked_at defaults to null', async () => {
+    const [u] = await db.insert(users).values({ username: 'tester', passwordHash: 'x' }).returning();
+    const [inv] = await db
+      .insert(invoices)
+      .values({
+        userId: u.id, number: '20260001', customerName: 'Test s.r.o.',
+        issueDate: '2026-01-10', dueDate: '2026-01-24', deliveryDate: '2026-01-10',
+      })
+      .returning();
+    expect(inv.lockedAt).toBeNull();
+
+    const pdf = Buffer.from('%PDF-1.4 test original');
+    await db.insert(invoiceOriginals).values({ invoiceId: inv.id, pdf, fileName: 'faktura-20260001.pdf' });
+    const [stored] = await db.select().from(invoiceOriginals).where(eq(invoiceOriginals.invoiceId, inv.id));
+    expect(Buffer.compare(stored.pdf, pdf)).toBe(0);
+    expect(stored.fileName).toBe('faktura-20260001.pdf');
+
+    await db.delete(invoices).where(eq(invoices.id, inv.id));
+    expect(await db.select().from(invoiceOriginals)).toHaveLength(0);
   });
 });

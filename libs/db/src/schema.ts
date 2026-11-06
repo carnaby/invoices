@@ -80,6 +80,8 @@ export const invoices = pgTable(
       .default(0),
     paidDate: date('paid_date', { mode: 'string' }),
     sentAt: timestamp('sent_at', { withTimezone: true }),
+    // Set for invoices imported from iDoklad: update and delete are refused (payments still allowed).
+    lockedAt: timestamp('locked_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -105,6 +107,16 @@ export const invoiceItems = pgTable(
   },
   (t) => [index('invoice_items_invoice_idx').on(t.invoiceId)],
 );
+
+// Original PDFs from iDoklad, kept apart so invoice queries never load the bytes.
+export const invoiceOriginals = pgTable('invoice_originals', {
+  invoiceId: uuid('invoice_id')
+    .primaryKey()
+    .references(() => invoices.id, { onDelete: 'cascade' }),
+  pdf: bytea('pdf').notNull(),
+  fileName: text('file_name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const settings = pgTable('settings', {
   userId: uuid('user_id')
