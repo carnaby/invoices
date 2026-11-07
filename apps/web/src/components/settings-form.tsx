@@ -149,7 +149,7 @@ function AccountCard() {
           <Button
             variant="secondary"
             data-testid="account-logout"
-            className="text-danger"
+            className="shrink-0 whitespace-nowrap text-danger"
             disabled={logout.isPending}
             onClick={() => logout.mutate()}
           >

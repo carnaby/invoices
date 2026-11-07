@@ -2,6 +2,7 @@
 // Next does not allow `export *` across a client boundary.
 import {
   useEffect,
+  useRef,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   type InputHTMLAttributes,
@@ -9,6 +10,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
+import { twMerge } from 'tailwind-merge';
 
 export * from './icons';
 
@@ -16,8 +18,9 @@ export * from './icons';
  * @types/react has no index signature for `data-*` on custom components. */
 type WithTestId = { 'data-testid'?: string };
 
+/** Joins class names; on a conflict (e.g. `text-ink` vs. a caller's `text-danger`) the later one wins. */
 export function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(' ');
+  return twMerge(classes);
 }
 
 // 16px text on phones: iOS zooms into any focused field with a smaller font.
@@ -55,18 +58,23 @@ export function StatTile({
 } & WithTestId) {
   const lines = Array.isArray(value) ? value : [value];
   const valueColor = tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-danger' : 'text-ink';
+  // Two tiles per row on a phone leave about 140px: a long amount gets a smaller size, and it may
+  // still wrap before the currency (or anywhere, as a last resort), but it is never clipped.
+  const long = Math.max(...lines.map((l) => l.length)) > 12;
   return (
-    <Card className={cn('min-w-0 overflow-hidden', className)} {...rest}>
+    <Card className={cn('min-w-0', className)} {...rest}>
       <p className="truncate text-xs font-medium text-muted sm:text-sm">{label}</p>
       <p
+        data-stat-value
         className={cn(
-          'mt-1 text-xl font-semibold tracking-tight tabular-nums sm:mt-2 sm:text-[28px] sm:leading-tight',
+          'mt-1 font-semibold tracking-tight tabular-nums [overflow-wrap:anywhere] sm:mt-2 sm:leading-tight',
+          long ? 'text-base sm:text-2xl' : 'text-xl sm:text-[28px]',
           valueColor,
         )}
       >
         {lines.map((line, i) => (
-          <span key={i} className="block whitespace-nowrap">
-            {line}
+          <span key={i} className="block">
+            {line.replace(/\xa0(?=[^\d\xa0]+$)/, ' ')}
           </span>
         ))}
       </p>
@@ -272,8 +280,9 @@ export function Td({ className, children, ...rest }: { className?: string; child
 
 /**
  * Modal surface: a bottom sheet on phones, a centered card from `sm` up.
- * Escape calls `onClose`; a click on the backdrop does not, so a stray tap
- * cannot throw away a half-filled form.
+ * Escape calls `onClose` unless focus is in a field or `dismissible` is false (e.g. while
+ * the action runs); a click on the backdrop never does, so a stray tap cannot throw away
+ * a half-filled form.
  */
 export function Sheet({
   title,
@@ -281,6 +290,7 @@ export function Sheet({
   children,
   footer,
   size = 'sm',
+  dismissible = true,
   ...rest
 }: {
   title: string;
@@ -288,9 +298,19 @@ export function Sheet({
   children?: ReactNode;
   footer?: ReactNode;
   size?: 'sm' | 'lg';
+  dismissible?: boolean;
 } & WithTestId) {
+  // Callers pass inline arrows; a ref keeps the listener stable so the effect runs once per open.
+  const latest = useRef({ onClose, dismissible });
+  latest.current = { onClose, dismissible };
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.isComposing || !latest.current.dismissible) return;
+      // Escape inside a field cancels autocomplete or IME input; it must not throw the text away.
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+      latest.current.onClose();
+    };
     const { overflow } = document.body.style;
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
@@ -298,7 +318,7 @@ export function Sheet({
       document.body.style.overflow = overflow;
       window.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
@@ -354,6 +374,7 @@ export function ConfirmDialog({
     <Sheet
       title={title}
       onClose={onCancel}
+      dismissible={!pending}
       footer={
         <>
           <Button variant="secondary" data-testid="cancel" onClick={onCancel}>

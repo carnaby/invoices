@@ -166,6 +166,9 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
     }));
     setPrefilled(true);
   }, [isNew, prefilled, settingsQuery.data, suggestQuery.data]);
+  // A new invoice waits for its suggested number and defaults, otherwise a quick save fails
+  // validation or the defaults overwrite what was typed. If loading fails, saving is allowed.
+  const ready = !isNew || prefilled || settingsQuery.isError || suggestQuery.isError;
 
   const create = trpc.invoices.create.useMutation({
     onSuccess: ({ id }) => router.push(`/invoices/${id}`),
@@ -228,6 +231,7 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ready) return;
     const result = invoiceInputSchema.safeParse(toRawInput(state));
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -382,7 +386,7 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
                     onChange={updateItem(idx, 'vatRate')}
                   />
                 </ItemField>
-                <div className="flex items-center justify-between gap-2 md:contents">
+                <div className="col-span-2 flex items-center justify-between gap-2 md:contents">
                   <span className="text-sm tabular-nums md:text-right" data-testid={`item-total-${idx}`}>
                     <span className="text-muted md:hidden">Spolu </span>
                     {formatMoney(rowTotal, state.currency)}
@@ -454,7 +458,7 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
         <Button type="button" variant="secondary" onClick={() => router.push('/invoices')}>
           Zrušiť
         </Button>
-        <Button type="submit" data-testid="save" disabled={submitting}>
+        <Button type="submit" data-testid="save" disabled={submitting || !ready}>
           {submitting ? 'Ukladá sa…' : 'Uložiť'}
         </Button>
       </div>

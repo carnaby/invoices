@@ -36,6 +36,7 @@ export function SendEmailDialog({
       title="Odoslať e-mailom"
       size="lg"
       onClose={onClose}
+      dismissible={!sendEmail.isPending}
       footer={
         <>
           <Button type="button" variant="secondary" data-testid="cancel" onClick={onClose}>

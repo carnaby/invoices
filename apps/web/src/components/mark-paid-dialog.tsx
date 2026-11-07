@@ -50,6 +50,7 @@ export function MarkPaidDialog({
     <Sheet
       title="Pridať úhradu"
       onClose={onClose}
+      dismissible={!addPayment.isPending}
       footer={
         <>
           <Button type="button" variant="secondary" data-testid="cancel" onClick={onClose}>
