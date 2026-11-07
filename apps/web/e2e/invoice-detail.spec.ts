@@ -113,7 +113,10 @@ test('send email without smtp shows Slovak error', async ({ page }) => {
   await page.getByTestId('item-desc-0').fill('Práce');
   await page.getByTestId('item-qty-0').fill('1');
   await page.getByTestId('item-price-0').fill('10');
+  // The suggested number arrives asynchronously; saving before it would fail validation.
+  await expect(page.getByTestId('number')).not.toHaveValue('');
   await page.getByTestId('save').click();
+  await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
 
   await page.getByTestId('send-email').click();
   await page.getByTestId('email-send').click();

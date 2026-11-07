@@ -45,6 +45,8 @@ test('contact selection prefills customer snapshot', async ({ page }) => {
   await page.getByTestId('ico').fill('11223344');
   await page.getByTestId('city').fill('Žilina');
   await page.getByTestId('save').click();
+  // Navigating away before the save finishes would cancel the request.
+  await expect(page).not.toHaveURL(/\/contacts\/new/);
 
   await page.goto('/invoices/new');
   await page.getByTestId('contact-select').selectOption({ label: 'Prefill s.r.o.' });
