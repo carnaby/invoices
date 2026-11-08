@@ -13,3 +13,7 @@ backups/
 !.env.example
 !docker/.env.prod.example
 *.tsbuildinfo
+# Database files and dumps never belong in this public repo (migrations in libs/db/migrations stay tracked).
+data/
+*.sql.gz
+*.dump

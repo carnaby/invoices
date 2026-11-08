@@ -143,18 +143,18 @@ describe('registration toggle', () => {
 
 describe('login throttle', () => {
   it('6th attempt from one IP gets TOO_MANY_REQUESTS even with the right password; another IP logs in', async () => {
-    await createCaller(createTestContext(db)).auth.register({ username: 'carnaby', password: 'password123' });
+    await createCaller(createTestContext(db)).auth.register({ username: 'owner', password: 'password123' });
     const attacker = createCaller(createTestContext(db, null, '203.0.113.7'));
     for (let i = 0; i < 5; i++) {
-      await expect(attacker.auth.login({ username: 'carnaby', password: 'wrongwrong' }))
+      await expect(attacker.auth.login({ username: 'owner', password: 'wrongwrong' }))
         .rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     }
-    await expect(attacker.auth.login({ username: 'carnaby', password: 'password123' }))
+    await expect(attacker.auth.login({ username: 'owner', password: 'password123' }))
       .rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
 
     const owner = createTestContext(db, null, '198.51.100.1');
-    await expect(createCaller(owner).auth.login({ username: 'carnaby', password: 'password123' }))
-      .resolves.toMatchObject({ username: 'carnaby' });
+    await expect(createCaller(owner).auth.login({ username: 'owner', password: 'password123' }))
+      .resolves.toMatchObject({ username: 'owner' });
     expect(owner.cookieJar.token).toBeDefined();
   });
 });

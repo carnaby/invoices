@@ -7,14 +7,14 @@ function setup() {
   const throttle = new LoginThrottle(limits, () => t);
   return { throttle, advance: (ms: number) => (t += ms) };
 }
-const fail = (th: LoginThrottle, ip: string, user = 'carnaby') => th.begin(ip, user); // never succeeds
+const fail = (th: LoginThrottle, ip: string, user = 'owner') => th.begin(ip, user); // never succeeds
 
 describe('LoginThrottle', () => {
   it('blocks the 6th attempt from one IP after 5 failures, another IP still works', () => {
     const { throttle } = setup();
     for (let i = 0; i < 5; i++) fail(throttle, '203.0.113.7');
     expect(() => fail(throttle, '203.0.113.7')).toThrow(expect.objectContaining({ code: 'TOO_MANY_REQUESTS' }));
-    expect(() => throttle.begin('198.51.100.1', 'carnaby').succeeded()).not.toThrow();
+    expect(() => throttle.begin('198.51.100.1', 'owner').succeeded()).not.toThrow();
   });
 
   it('blocks per IP regardless of the username tried', () => {
@@ -34,7 +34,7 @@ describe('LoginThrottle', () => {
 
   it('blocks one account after 30 failures from many IPs (distributed guessing), case-insensitive', () => {
     const { throttle } = setup();
-    for (let i = 0; i < 30; i++) fail(throttle, `203.0.113.${i}`, i % 2 ? 'Carnaby' : 'carnaby ');
+    for (let i = 0; i < 30; i++) fail(throttle, `203.0.113.${i}`, i % 2 ? 'Owner' : 'owner ');
     expect(() => fail(throttle, '198.51.100.1')).toThrow(expect.objectContaining({ code: 'TOO_MANY_REQUESTS' }));
     expect(() => fail(throttle, '198.51.100.1', 'someone-else')).not.toThrow();
   });
@@ -42,7 +42,7 @@ describe('LoginThrottle', () => {
   it('a successful login clears the counters of its IP and account', () => {
     const { throttle } = setup();
     for (let i = 0; i < 4; i++) fail(throttle, '203.0.113.7');
-    throttle.begin('203.0.113.7', 'carnaby').succeeded();
+    throttle.begin('203.0.113.7', 'owner').succeeded();
     for (let i = 0; i < 5; i++) fail(throttle, '203.0.113.7');
     expect(() => fail(throttle, '203.0.113.7')).toThrow();
   });
@@ -52,7 +52,7 @@ describe('LoginThrottle', () => {
     let started = 0;
     for (let i = 0; i < 10; i++) {
       try {
-        throttle.begin('203.0.113.7', 'carnaby');
+        throttle.begin('203.0.113.7', 'owner');
         started++;
       } catch {
         // blocked
