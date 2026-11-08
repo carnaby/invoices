@@ -26,7 +26,9 @@ services:
       POSTGRES_USER: invoices
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: invoices
+    security_opt: [no-new-privileges:true]
     volumes:
+      # Create it before the first `up`: mkdir -m 700 -p data/postgres (an empty dir created by Docker would belong to root).
       - ./data/postgres:/var/lib/postgresql/data
     # Tabula global decision #cb98: 2m, the API waits on it. TCP check: during initdb the server listens on the socket only.
     healthcheck:
@@ -52,9 +54,12 @@ services:
       API_PORT: '3333'
       WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN in .env}
     networks: [default, edge]
-    # Chrome (puppeteer) renders the PDFs.
+    # Chrome (puppeteer) renders the PDFs with --no-sandbox --disable-dev-shm-usage (apps/api/src/pdf/pdf.service.ts):
+    # no setuid sandbox and no /dev/shm needed. init: pnpm runs as PID 1 and has no SIGTERM handler; tini forwards the
+    # signal (clean stop instead of a kill after 10 s) and reaps Chrome's orphaned processes.
+    init: true
+    security_opt: [no-new-privileges:true]
     mem_limit: 1g
-    shm_size: 256m
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
     # Tabula global decision #cb98: 30m, nothing waits on it.
@@ -73,6 +78,9 @@ services:
     restart: unless-stopped
     depends_on: [invoices-api]
     networks: [default, edge]
+    # init: node runs as PID 1 (clean stop on SIGTERM).
+    init: true
+    security_opt: [no-new-privileges:true]
     mem_limit: 512m
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
