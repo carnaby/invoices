@@ -17,3 +17,5 @@ backups/
 data/
 *.sql.gz
 *.dump
+# Production deployment files live outside this public repo.
+deploy/
