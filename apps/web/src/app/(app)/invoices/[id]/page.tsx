@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { calcItemTotals, derivePaymentStatus, isOverdue, showsSupplierIcDph } from '@invoices/shared';
 import { MarkPaidDialog } from '@/components/mark-paid-dialog';
+import { PaymentsCard } from '@/components/payments-card';
 import { SendEmailDialog } from '@/components/send-email-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import {
@@ -324,6 +325,14 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
       </Card>
+
+      <PaymentsCard
+        invoiceId={id}
+        payments={query.data.payments}
+        paidAmount={invoice.paidAmount}
+        total={totals.total}
+        currency={invoice.currency}
+      />
 
       {dialog === 'markPaid' && (
         <MarkPaidDialog

@@ -160,6 +160,49 @@ test('detail: totals, mark paid, pdf download, delete', async ({ page }) => {
   await expect(page.getByTestId(`invoice-row-${y}0001`)).toBeHidden();
 });
 
+test('payments history: two payments listed, deleting one reopens the invoice', async ({ page }) => {
+  await registerAndLogin(page);
+  await page.goto('/invoices/new');
+  await page.getByTestId('customerName').fill('História s.r.o.');
+  await page.getByTestId('item-desc-0').fill('Práce');
+  await page.getByTestId('item-qty-0').fill('1');
+  await page.getByTestId('item-price-0').fill('120');
+  await page.getByTestId('save').click();
+  await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
+  await expect(page.getByTestId('payments-card')).toHaveCount(0);
+
+  await page.getByTestId('mark-paid').click();
+  await page.getByTestId('paid-amount').fill('50');
+  await page.getByTestId('paid-date').fill('2026-02-01');
+  await page.getByTestId('confirm').click();
+  await expect(page.getByTestId('paid-info')).toContainText('50,00');
+
+  await page.getByTestId('mark-paid').click();
+  await page.getByTestId('pay-full').click();
+  await page.getByTestId('paid-date').fill('2026-02-15');
+  await page.getByTestId('confirm').click();
+
+  const rows = page.getByTestId('payment-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('1. 2. 2026');
+  await expect(rows.first()).toContainText('50,00');
+  await expect(rows.nth(1)).toContainText('15. 2. 2026');
+  await expect(rows.nth(1)).toContainText('70,00');
+  await expect(page.getByTestId('payments-paid')).toContainText('120,00');
+  await expect(page.getByTestId('payments-remaining')).toContainText('0,00');
+  await expect(page.getByTestId('locked-badge')).toContainText('Uzamknutá · uhradená');
+
+  await rows.nth(1).getByTestId('delete-payment').click();
+  await expect(page.getByText('Úhrada 70,00 € z 15. 2. 2026 sa zmaže.')).toBeVisible();
+  await page.getByTestId('confirm').click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByTestId('paid-info')).toContainText('50,00');
+  await expect(page.getByTestId('paid-info')).toContainText('120,00');
+  await expect(page.getByTestId('payments-remaining')).toContainText('70,00');
+  await expect(page.getByTestId('locked-badge')).toHaveCount(0);
+  await expect(page.getByTestId('edit-invoice')).toBeVisible();
+});
+
 test('send email without smtp shows Slovak error', async ({ page }) => {
   await registerAndLogin(page);
   await page.goto('/invoices/new');
