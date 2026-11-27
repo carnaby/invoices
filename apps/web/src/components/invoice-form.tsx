@@ -173,8 +173,12 @@ export function InvoiceForm({ initial, invoiceId }: { initial?: InvoiceInput; in
   const create = trpc.invoices.create.useMutation({
     onSuccess: ({ id }) => router.push(`/invoices/${id}`),
   });
+  const utils = trpc.useUtils();
   const update = trpc.invoices.update.useMutation({
     onSuccess: ({ id }) => router.push(`/invoices/${id}`),
+    // The invoice may have been locked meanwhile: reload it so the edit page shows the lock.
+    // What was typed stays, because the form keeps its own state.
+    onError: (_error, { id }) => utils.invoices.get.invalidate({ id }),
   });
   const submitting = create.isPending || update.isPending;
   const serverError = create.error ?? update.error;

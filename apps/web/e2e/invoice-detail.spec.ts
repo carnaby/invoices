@@ -58,6 +58,61 @@ test('locked iDoklad invoice: no edit or delete, both PDFs download, payments st
   await expect(page.getByTestId('save')).toHaveCount(0);
 });
 
+test('an edit refused because another tab paid the invoice meanwhile shows the lock', async ({ page }) => {
+  await registerAndLogin(page);
+  await page.goto('/invoices/new');
+  await page.getByTestId('customerName').fill('Zaplatená medzitým s.r.o.');
+  await page.getByTestId('item-desc-0').fill('Práce');
+  await page.getByTestId('item-qty-0').fill('1');
+  await page.getByTestId('item-price-0').fill('100');
+  await page.getByTestId('save').click();
+  await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
+  const id = page.url().split('/').pop()!;
+
+  await page.goto(`/invoices/${id}/edit`);
+  await expect(page.getByTestId('save')).toBeVisible();
+
+  const other = await page.context().newPage();
+  await other.goto(`/invoices/${id}`);
+  await other.getByTestId('mark-paid').click();
+  await other.getByTestId('pay-full').click();
+  await other.getByTestId('confirm').click();
+  await expect(other.getByTestId('locked-badge')).toContainText('Uzamknutá · uhradená');
+  await other.close();
+
+  await page.getByTestId('customerName').fill('Neuložené s.r.o.');
+  await page.getByTestId('save').click();
+  // The form gives way to the lock message without a reload.
+  await expect(page.getByTestId('locked-message')).toContainText('Uhradená faktúra je uzamknutá');
+  await expect(page.getByTestId('save')).toHaveCount(0);
+});
+
+test('a refused edit that is not a lock keeps what was typed', async ({ page }) => {
+  await registerAndLogin(page);
+  await page.goto('/invoices/new');
+  await page.getByTestId('customerName').fill('Mena s.r.o.');
+  await page.getByTestId('item-desc-0').fill('Práce');
+  await page.getByTestId('item-qty-0').fill('1');
+  await page.getByTestId('item-price-0').fill('100');
+  await page.getByTestId('save').click();
+  await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
+  const id = page.url().split('/').pop()!;
+
+  await page.getByTestId('mark-paid').click();
+  await page.getByTestId('paid-amount').fill('40');
+  await page.getByTestId('confirm').click();
+  await expect(page.getByTestId('paid-info')).toContainText('40,00');
+
+  await page.goto(`/invoices/${id}/edit`);
+  await page.getByTestId('customerName').fill('Mena 2 s.r.o.');
+  await page.getByTestId('currency').fill('CZK');
+  await page.getByTestId('save').click();
+  await expect(page.getByText('Menu faktúry nemožno zmeniť, kým má zapísané úhrady.')).toBeVisible();
+  await expect(page.getByTestId('currency')).toHaveValue('CZK');
+  await expect(page.getByTestId('customerName')).toHaveValue('Mena 2 s.r.o.');
+  await expect(page).toHaveURL(new RegExp(`/invoices/${id}/edit$`));
+});
+
 test('detail: totals, mark paid, pdf download, delete', async ({ page }) => {
   await registerAndLogin(page);
   const y = new Date().getFullYear();
