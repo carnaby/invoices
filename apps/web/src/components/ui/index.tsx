@@ -236,48 +236,6 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="py-10 text-center text-sm text-muted">{children}</p>;
 }
 
-export function Table({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-      <table className={cn('w-full text-left text-sm', className)}>{children}</table>
-    </div>
-  );
-}
-
-export function THead({ children }: { children: ReactNode }) {
-  return (
-    <thead className="border-b border-line text-xs font-medium uppercase tracking-wide text-muted">{children}</thead>
-  );
-}
-
-export function TBody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-line">{children}</tbody>;
-}
-
-export function Tr({ className, children, ...rest }: HTMLAttributes<HTMLTableRowElement> & WithTestId) {
-  return (
-    <tr className={cn('transition hover:bg-canvas/60', className)} {...rest}>
-      {children}
-    </tr>
-  );
-}
-
-export function Th({ className, children, ...rest }: { className?: string; children: ReactNode } & WithTestId) {
-  return (
-    <th className={cn('py-3 pr-4 font-medium', className)} {...rest}>
-      {children}
-    </th>
-  );
-}
-
-export function Td({ className, children, ...rest }: { className?: string; children: ReactNode } & WithTestId) {
-  return (
-    <td className={cn('py-3.5 pr-4 text-ink', className)} {...rest}>
-      {children}
-    </td>
-  );
-}
-
 /**
  * Modal surface: a bottom sheet on phones, a centered card from `sm` up.
  * Escape calls `onClose` unless focus is in a field or `dismissible` is false (e.g. while
