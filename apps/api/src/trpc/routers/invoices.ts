@@ -8,7 +8,7 @@ import {
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import {
-  checkAddedPayment, checkPaidAmount, checkStoredTotal, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
+  checkAddedPayment, checkCurrencyChange, checkPaidAmount, checkStoredTotal, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
   lockForEdit, todayIso,
 } from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
@@ -67,6 +67,7 @@ export const invoicesRouter = router({
       try {
         return await ctx.db.transaction(async (tx) => {
           const current = await lockForEdit(tx, ctx.userId, input.id);
+          checkCurrencyChange(current, invoice.currency);
           await tx
             .update(invoices)
             .set({ ...invoice, updatedAt: new Date() })

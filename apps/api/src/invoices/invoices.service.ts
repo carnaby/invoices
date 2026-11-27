@@ -106,6 +106,16 @@ export async function checkStoredTotal(tx: DbTx, id: string, row: { paidAmount: 
   }
 }
 
+/** Refuses a currency change while something is paid: the paid amount keeps no currency of its own. */
+export function checkCurrencyChange(row: { paidAmount: number; currency: string }, currency: string) {
+  if (toCents(row.paidAmount) !== 0 && currency !== row.currency) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Menu faktúry nemožno zmeniť, kým má zapísané úhrady. Najprv zrušte úhrady.',
+    });
+  }
+}
+
 /** Refuses a payment that would bring the paid amount above the invoice total. */
 export async function checkAddedPayment(tx: DbTx, userId: string, id: string, amount: number) {
   const { paidAmount, total, currency } = await lockInvoiceRow(tx, userId, id);

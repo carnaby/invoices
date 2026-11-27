@@ -333,6 +333,26 @@ describe('paid invoices are locked', () => {
     expect((await caller.invoices.get({ id })).totals.total).toBe(150);
   });
 
+  it('the currency of an invoice with payments cannot change (a payment keeps no currency of its own)', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create({ ...baseInvoice, currency: 'EUR' });
+    await caller.invoices.addPayment({ id, amount: 100 });
+    await expect(
+      caller.invoices.update({ id, data: { ...baseInvoice, currency: 'CZK' } }),
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Menu faktúry nemožno zmeniť, kým má zapísané úhrady. Najprv zrušte úhrady.',
+    });
+    expect((await caller.invoices.get({ id })).invoice.currency).toBe('EUR');
+
+    await caller.invoices.update({ id, data: { ...baseInvoice, currency: 'EUR', customerName: 'Iná' } });
+    expect((await caller.invoices.get({ id })).invoice.customerName).toBe('Iná');
+
+    await caller.invoices.resetPayments({ id });
+    await caller.invoices.update({ id, data: { ...baseInvoice, currency: 'CZK' } });
+    expect((await caller.invoices.get({ id })).invoice.currency).toBe('CZK');
+  });
+
   it('a credit note (negative total, nothing paid) can still be edited', async () => {
     const caller = await newUserCaller('jozef');
     const credit = { ...baseInvoice, items: [{ description: 'Dobropis', quantity: 1, unitPrice: -50, vatRate: 0 }] };
