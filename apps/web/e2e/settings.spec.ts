@@ -21,6 +21,46 @@ test('settings persist across reload', async ({ page }) => {
   await expect(page.getByTestId('defaultDueDays')).toHaveValue('21');
 });
 
+test('a § 7a IČ DPH shows only on invoices for customers outside Slovakia', async ({ page }) => {
+  await registerAndLogin(page);
+  await page.goto('/settings');
+  await page.getByTestId('supplierName').fill('Ján Testovací');
+  await page.getByTestId('supplierIcDph').fill('SK1000000001');
+  await expect(page.getByTestId('supplierVatRegistration')).toHaveValue('identified');
+  await page.getByTestId('save-supplier').click();
+  await expect(page.getByTestId('saved-indicator').first()).toBeVisible();
+
+  const ids: Record<string, string> = {};
+  for (const [number, country] of [['20260001', 'Slovensko'], ['20260002', 'Česká republika']]) {
+    ids[country] = await page.evaluate(async ({ number, country }) => {
+      const res = await fetch('http://localhost:3333/trpc/invoices.create', {
+        method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ json: {
+          number, customerName: 'Odberateľ s.r.o.', customerCountry: country,
+          issueDate: '2026-01-10', dueDate: '2026-01-24', deliveryDate: '2026-01-10',
+          items: [{ description: 'X', quantity: 1, unitPrice: 100, vatRate: 0, unit: 'ks' }],
+          customerCcEmails: [], currency: 'EUR',
+        } }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return (await res.json()).result.data.json.id as string;
+    }, { number, country });
+  }
+
+  await page.goto(`/invoices/${ids['Slovensko']}`);
+  await expect(page.getByText('Ján Testovací')).toBeVisible();
+  await expect(page.getByText('SK1000000001')).toHaveCount(0);
+  await page.goto(`/invoices/${ids['Česká republika']}`);
+  await expect(page.getByText('IČ DPH: SK1000000001')).toBeVisible();
+
+  await page.goto('/settings');
+  await page.getByTestId('supplierVatRegistration').selectOption('payer');
+  await page.getByTestId('save-supplier').click();
+  await expect(page.getByTestId('saved-indicator').first()).toBeVisible();
+  await page.goto(`/invoices/${ids['Slovensko']}`);
+  await expect(page.getByText('IČ DPH: SK1000000001')).toBeVisible();
+});
+
 test('signature upload shows preview and can be deleted', async ({ page }) => {
   await registerAndLogin(page);
   await page.goto('/settings');

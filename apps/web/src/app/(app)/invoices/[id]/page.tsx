@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { calcItemTotals, derivePaymentStatus, isOverdue } from '@invoices/shared';
+import { calcItemTotals, derivePaymentStatus, isOverdue, showsSupplierIcDph } from '@invoices/shared';
 import { MarkPaidDialog } from '@/components/mark-paid-dialog';
 import { SendEmailDialog } from '@/components/send-email-dialog';
 import { StatusBadge } from '@/components/status-badge';
@@ -78,6 +78,14 @@ export default function InvoiceDetailPage() {
 
   const { invoice, items, totals, locked, lockReason, hasOriginal } = query.data;
   const settings = settingsQuery.data;
+  // Same rule as the PDF: a § 7a IČ DPH only for a customer outside Slovakia.
+  const supplierIds = idLine(
+    settings?.supplierIco,
+    settings?.supplierDic,
+    settings && showsSupplierIcDph(settings.supplierVatRegistration, invoice.customerCountry)
+      ? settings.supplierIcDph
+      : null,
+  );
   const status = derivePaymentStatus(totals.total, invoice.paidAmount);
   const overdue = isOverdue(invoice.dueDate, status, todayIso());
 
@@ -173,11 +181,7 @@ export default function InvoiceDetailPage() {
               <p>{[settings?.supplierZip, settings?.supplierCity].filter(Boolean).join(' ')}</p>
             )}
             {settings?.supplierCountry && <p>{settings.supplierCountry}</p>}
-            {idLine(settings?.supplierIco, settings?.supplierDic, settings?.supplierIcDph) && (
-              <p className="pt-1 text-muted">
-                {idLine(settings?.supplierIco, settings?.supplierDic, settings?.supplierIcDph)}
-              </p>
-            )}
+            {supplierIds && <p className="pt-1 text-muted">{supplierIds}</p>}
           </div>
         </Card>
         <Card>

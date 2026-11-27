@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { VAT_REGISTRATIONS } from './vat';
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Dátum musí byť vo formáte RRRR-MM-DD');
 const optionalTrimmed = z.string().trim().max(200).optional().nullable();
@@ -85,6 +86,7 @@ export const settingsInputSchema = z.object({
   supplierIco: optionalTrimmed,
   supplierDic: optionalTrimmed,
   supplierIcDph: optionalTrimmed,
+  supplierVatRegistration: z.enum(VAT_REGISTRATIONS).default('identified'),
   registrationText: z.string().max(500).optional().nullable(),
   supplierEmail: optionalEmail,
   supplierPhone: optionalTrimmed,

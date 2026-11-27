@@ -40,6 +40,32 @@ describe('generateInvoicePdf', () => {
     }
   }, 60000);
 
+  it('a § 7a IČ DPH is printed only for a customer outside Slovakia; a VAT payer prints it always', async () => {
+    const u = await createCaller(createTestContext(db)).auth.register({ username: 'jozef', password: 'password123' });
+    const caller = createCaller(createTestContext(db, u.id));
+    expect((await caller.settings.get()).supplierVatRegistration).toBe('identified');
+    await caller.settings.update({ supplierName: 'Ján Testovací', supplierIcDph: 'SK1000000001' });
+
+    const invoice = (number: string, customerCountry: string) =>
+      caller.invoices.create({
+        number, customerName: 'Odberateľ s.r.o.', customerCountry,
+        issueDate: '2026-01-10', dueDate: '2026-01-24', deliveryDate: '2026-01-10',
+        items: [{ description: 'Práce', quantity: 1, unitPrice: 100, vatRate: 0 }],
+      });
+    const domestic = await invoice('20260001', 'Slovensko');
+    const abroad = await invoice('20260002', 'Česká republika');
+    const { default: pdfParse } = await import('pdf-parse');
+    const text = async (id: string) => (await pdfParse(await generateInvoicePdf(db, u.id, id))).text;
+
+    expect(await text(domestic.id)).not.toContain('SK1000000001');
+    expect(await text(abroad.id)).toContain('IČ DPH: SK1000000001');
+
+    await caller.settings.update({
+      supplierName: 'Ján Testovací', supplierIcDph: 'SK1000000001', supplierVatRegistration: 'payer',
+    });
+    expect(await text(domestic.id)).toContain('IČ DPH: SK1000000001');
+  }, 60000);
+
   it('404s for foreign invoice', async () => {
     const anon = createCaller(createTestContext(db));
     const a = await anon.auth.register({ username: 'alice', password: 'password123' });

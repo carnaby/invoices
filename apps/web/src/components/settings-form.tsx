@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import type { SettingsInput } from '@invoices/shared';
+import type { SettingsInput, VatRegistration } from '@invoices/shared';
 import { changePasswordSchema } from '@invoices/shared';
-import { Button, Card, Field, Input, Textarea, CardTitle, LogoutIcon } from '@/components/ui';
+import { Button, Card, Field, Input, Select, Textarea, CardTitle, LogoutIcon } from '@/components/ui';
 import { apiUrl, trpc } from '@/lib/trpc';
 import { useLogout } from '@/lib/use-logout';
 
@@ -17,6 +17,7 @@ type FormState = {
   supplierIco: string;
   supplierDic: string;
   supplierIcDph: string;
+  supplierVatRegistration: VatRegistration;
   registrationText: string;
   supplierEmail: string;
   supplierPhone: string;
@@ -33,7 +34,7 @@ type FormState = {
   emailFrom: string;
 };
 
-type TextField = Exclude<keyof FormState, 'smtpSecure'>;
+type TextField = Exclude<keyof FormState, 'smtpSecure' | 'supplierVatRegistration'>;
 
 function toFormState(s: SettingsData): FormState {
   return {
@@ -45,6 +46,7 @@ function toFormState(s: SettingsData): FormState {
     supplierIco: s.supplierIco ?? '',
     supplierDic: s.supplierDic ?? '',
     supplierIcDph: s.supplierIcDph ?? '',
+    supplierVatRegistration: s.supplierVatRegistration ?? 'identified',
     registrationText: s.registrationText ?? '',
     supplierEmail: s.supplierEmail ?? '',
     supplierPhone: s.supplierPhone ?? '',
@@ -72,6 +74,7 @@ function buildPayload(form: FormState): SettingsInput {
     supplierIco: form.supplierIco,
     supplierDic: form.supplierDic,
     supplierIcDph: form.supplierIcDph,
+    supplierVatRegistration: form.supplierVatRegistration,
     registrationText: form.registrationText,
     supplierEmail: form.supplierEmail,
     supplierPhone: form.supplierPhone,
@@ -285,7 +288,19 @@ export function SettingsForm({ initial }: { initial: SettingsData }) {
             <Input value={form.supplierDic} onChange={set('supplierDic')} />
           </Field>
           <Field label="IČ DPH">
-            <Input value={form.supplierIcDph} onChange={set('supplierIcDph')} />
+            <Input data-testid="supplierIcDph" value={form.supplierIcDph} onChange={set('supplierIcDph')} />
+          </Field>
+          <Field label="IČ DPH pridelené podľa">
+            <Select
+              data-testid="supplierVatRegistration"
+              value={form.supplierVatRegistration}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, supplierVatRegistration: e.target.value as VatRegistration }))
+              }
+            >
+              <option value="identified">§ 7 / § 7a, nie som platiteľ: len pri odberateľovi mimo SR</option>
+              <option value="payer">§ 4, platiteľ DPH: na každej faktúre</option>
+            </Select>
           </Field>
           <Field label="E-mail">
             <Input type="email" value={form.supplierEmail} onChange={set('supplierEmail')} />

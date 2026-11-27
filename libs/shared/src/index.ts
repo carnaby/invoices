@@ -5,3 +5,4 @@ export * from './numbering';
 export * from './schemas';
 export * from './dates';
 export * from './format';
+export * from './vat';

@@ -130,6 +130,10 @@ export const settings = pgTable('settings', {
   supplierIco: text('supplier_ico'),
   supplierDic: text('supplier_dic'),
   supplierIcDph: text('supplier_ic_dph'),
+  // 'identified' = IČ DPH under § 7 / § 7a (not a VAT payer), 'payer' = VAT payer under § 4.
+  supplierVatRegistration: text('supplier_vat_registration', { enum: ['identified', 'payer'] })
+    .notNull()
+    .default('identified'),
   registrationText: text('registration_text'),
   supplierEmail: text('supplier_email'),
   supplierPhone: text('supplier_phone'),

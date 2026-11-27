@@ -1,5 +1,5 @@
 import type { invoiceItems, invoices, settings } from '@invoices/db';
-import { calcItemTotals, type InvoiceTotals } from '@invoices/shared';
+import { calcItemTotals, showsSupplierIcDph, type InvoiceTotals } from '@invoices/shared';
 
 export type InvoiceRow = typeof invoices.$inferSelect;
 export type ItemRow = typeof invoiceItems.$inferSelect;
@@ -205,7 +205,13 @@ export function renderInvoiceHtml(data: InvoicePdfData): string {
       <div class="label" style="color:#6e6e73;font-size:9pt;margin-bottom:1mm;">Dodávateľ</div>
       <div class="name">${esc(settings?.supplierName)}</div>
       ${addressLines(settings?.supplierStreet, settings?.supplierZip, settings?.supplierCity, settings?.supplierCountry)}
-      ${idLine(settings?.supplierIco, settings?.supplierDic, settings?.supplierIcDph)}
+      ${idLine(
+        settings?.supplierIco,
+        settings?.supplierDic,
+        settings && showsSupplierIcDph(settings.supplierVatRegistration, invoice.customerCountry)
+          ? settings.supplierIcDph
+          : null,
+      )}
       ${contactLine ? `<div class="id-line">${contactLine}</div>` : ''}
     </div>
     <div class="header-right">

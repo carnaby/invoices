@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "supplier_vat_registration" text DEFAULT 'identified' NOT NULL;
