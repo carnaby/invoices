@@ -116,6 +116,9 @@ export const addPaymentSchema = z.object({
 });
 export type AddPaymentInput = z.infer<typeof addPaymentSchema>;
 
+/** One recorded payment, removed again (e.g. typed by mistake). */
+export const deletePaymentSchema = z.object({ paymentId: z.string().uuid() });
+
 export const sendEmailSchema = z.object({
   id: z.string().uuid(),
   subject: z.string().trim().min(1, 'Predmet je povinný').max(200),

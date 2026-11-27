@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { invoiceItems, invoicePayments, invoices, settings } from '@invoices/db';
 import {
-  addPaymentSchema, derivePaymentStatus, invoiceInputSchema, isOverdue,
+  addPaymentSchema, deletePaymentSchema, derivePaymentStatus, invoiceInputSchema, isOverdue,
   round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
@@ -187,6 +187,22 @@ export const invoicesRouter = router({
         amount: round2(input.amount),
       });
       return { id: input.id };
+    }),
+  ),
+
+  // Removes one payment typed by mistake; like adding one, it is allowed on a locked invoice and a paid
+  // invoice unlocks again. The invoice row is locked first, so it is counted in turn with a payment added at once.
+  deletePayment: authedProcedure.input(deletePaymentSchema).mutation(({ ctx, input }) =>
+    ctx.db.transaction(async (tx) => {
+      const [payment] = await tx
+        .select({ invoiceId: invoicePayments.invoiceId })
+        .from(invoicePayments)
+        .innerJoin(invoices, eq(invoices.id, invoicePayments.invoiceId))
+        .where(and(eq(invoicePayments.id, input.paymentId), eq(invoices.userId, ctx.userId)));
+      if (!payment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Úhrada neexistuje' });
+      await lockInvoiceRow(tx, ctx.userId, payment.invoiceId);
+      await tx.delete(invoicePayments).where(eq(invoicePayments.id, input.paymentId));
+      return { id: payment.invoiceId };
     }),
   ),
 

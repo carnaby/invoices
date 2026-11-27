@@ -409,6 +409,49 @@ describe('paid invoices are locked', () => {
     await caller.invoices.remove({ id });
   });
 
+  it('deletePayment removes one payment and unlocks a paid invoice', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    await caller.invoices.addPayment({ id, amount: 200, paidDate: '2026-02-01' });
+    await caller.invoices.addPayment({ id, amount: 90, paidDate: '2026-02-15' });
+    const before = await caller.invoices.get({ id });
+    expect(before.lockReason).toBe('paid');
+    const result = await caller.invoices.deletePayment({ paymentId: before.payments[1].id });
+    expect(result).toEqual({ id });
+    const after = await caller.invoices.get({ id });
+    expect(after.payments.map((p) => p.amount)).toEqual([200]);
+    expect(after.invoice.paidAmount).toBe(200);
+    expect(after.invoice.paidDate).toBe('2026-02-01');
+    expect(after.lockReason).toBeNull();
+  });
+
+  it('deletePayment keeps the iDoklad lock', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create(baseInvoice);
+    await lock(id);
+    await caller.invoices.addPayment({ id, amount: 100 });
+    const { payments } = await caller.invoices.get({ id });
+    await caller.invoices.deletePayment({ paymentId: payments[0].id });
+    const got = await caller.invoices.get({ id });
+    expect(got).toMatchObject({ locked: true, lockReason: 'idoklad' });
+    expect(got.invoice.paidAmount).toBe(0);
+  });
+
+  it("deletePayment of another user's payment is NOT_FOUND", async () => {
+    const owner = await newUserCaller('jozef');
+    const { id } = await owner.invoices.create(baseInvoice);
+    await owner.invoices.addPayment({ id, amount: 100 });
+    const { payments } = await owner.invoices.get({ id });
+    const other = await newUserCaller('cudzi');
+    await expect(other.invoices.deletePayment({ paymentId: payments[0].id })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(
+      owner.invoices.deletePayment({ paymentId: '00000000-0000-4000-8000-000000000000' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Úhrada neexistuje' });
+    expect((await owner.invoices.get({ id })).payments).toHaveLength(1);
+  });
+
   it('resetPayments keeps the iDoklad lock and is NOT_FOUND for another user', async () => {
     const owner = await newUserCaller('jozef');
     const { id } = await owner.invoices.create(baseInvoice);
