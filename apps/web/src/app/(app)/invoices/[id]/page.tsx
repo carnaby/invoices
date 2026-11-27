@@ -42,6 +42,13 @@ const LOCK_BADGE = {
 const ITEM_COLS =
   'md:grid-cols-[minmax(0,1fr)_5rem_3rem_7rem_4.5rem_7rem_6rem_7rem] md:gap-x-4';
 
+/** "Zmaže sa 1 úhrada", "Zmažú sa 3 úhrady", "Zmaže sa 6 úhrad" (Slovak agreement by count). */
+function paymentsCountText(count: number): string {
+  if (count === 1) return 'Zmaže sa 1 úhrada';
+  if (count >= 2 && count <= 4) return `Zmažú sa ${count} úhrady`;
+  return `Zmaže sa ${count} úhrad`;
+}
+
 function idLine(ico?: string | null, dic?: string | null, icDph?: string | null): string {
   return [ico && `IČO: ${ico}`, dic && `DIČ: ${dic}`, icDph && `IČ DPH: ${icDph}`]
     .filter(Boolean)
@@ -369,7 +376,7 @@ export default function InvoiceDetailPage() {
       <ConfirmDialog
         open={dialog === 'resetPayments'}
         title="Zrušiť úhrady?"
-        description={`Uhradená suma ${formatMoney(invoice.paidAmount, invoice.currency)} sa vynuluje.${
+        description={`${paymentsCountText(query.data.payments.length)} v sume ${formatMoney(invoice.paidAmount, invoice.currency)}.${
           lockReason === 'paid' ? ' Faktúra sa tým odomkne.' : ''
         }`}
         confirmLabel="Zrušiť úhrady"

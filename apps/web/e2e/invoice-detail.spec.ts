@@ -147,8 +147,9 @@ test('detail: totals, mark paid, pdf download, delete', async ({ page }) => {
   expect(pdfResponse.status()).toBe(200);
   expect(pdfResponse.headers()['content-type']).toContain('application/pdf');
 
-  // Resetting the payments unlocks it again.
+  // Resetting the payments unlocks it again; the dialog says the payment history goes with it.
   await page.getByTestId('reset-payments').click();
+  await expect(page.getByText('Zmaže sa 1 úhrada v sume 120,00 €.')).toBeVisible();
   await page.getByTestId('confirm').click();
   await expect(page.getByTestId('locked-badge')).toHaveCount(0);
   await expect(page.getByText('Neuhradená')).toBeVisible();
