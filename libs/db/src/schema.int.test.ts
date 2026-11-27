@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, truncateAll } from './testing';
 import { eq } from 'drizzle-orm';
-import { users, contacts, invoices, invoiceItems, invoiceOriginals, settings } from './schema';
+import { users, contacts, invoices, invoiceItems, invoiceOriginals, invoicePayments, settings } from './schema';
 import type { Db } from './client';
 
 let db: Db;
@@ -46,7 +46,34 @@ describe('schema', () => {
     const rows = await db.select().from(invoices);
     expect(rows).toHaveLength(1);
     expect(rows[0].currency).toBe('EUR');
-    expect(rows[0].paidAmount).toBe(0);
+  });
+
+  async function newInvoice() {
+    const [u] = await db.insert(users).values({ username: 'platby', passwordHash: 'x' }).returning();
+    const [inv] = await db
+      .insert(invoices)
+      .values({
+        userId: u.id, number: '20260001', customerName: 'Test s.r.o.',
+        issueDate: '2026-01-10', dueDate: '2026-01-24', deliveryDate: '2026-01-10',
+      })
+      .returning();
+    return inv;
+  }
+
+  it('payments cascade with their invoice', async () => {
+    const inv = await newInvoice();
+    await db.insert(invoicePayments).values([
+      { invoiceId: inv.id, paidOn: '2026-02-01', amount: 10.5 },
+      { invoiceId: inv.id, paidOn: '2026-02-01', amount: 20 },
+    ]);
+    expect(await db.select().from(invoicePayments)).toHaveLength(2);
+    await db.delete(invoices).where(eq(invoices.id, inv.id));
+    expect(await db.select().from(invoicePayments)).toHaveLength(0);
+  });
+
+  it('rejects a non-positive payment', async () => {
+    const inv = await newInvoice();
+    await expect(db.insert(invoicePayments).values({ invoiceId: inv.id, paidOn: '2026-02-01', amount: 0 })).rejects.toThrow();
   });
 
   it('enforces unique invoice number per user', async () => {

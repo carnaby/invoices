@@ -69,13 +69,31 @@ describe('invoices', () => {
     expect(totals.total).toBe(999);
   });
 
-  it('markPaid sets amount and defaults paidDate to today', async () => {
+  it('get lists payments in date order, same-day payments in the order they were added', async () => {
     const caller = await newUserCaller('jozef');
-    const { id } = await caller.invoices.create(baseInvoice);
-    await caller.invoices.markPaid({ id, paidAmount: 290 });
-    const { invoice } = await caller.invoices.get({ id });
-    expect(invoice.paidAmount).toBe(290);
-    expect(invoice.paidDate).toBe(todayIso());
+    const { id } = await caller.invoices.create(baseInvoice); // total 290
+    await caller.invoices.addPayment({ id, amount: 50, paidDate: '2026-02-10' });
+    await caller.invoices.addPayment({ id, amount: 20, paidDate: '2026-02-01' });
+    await caller.invoices.addPayment({ id, amount: 30, paidDate: '2026-02-10' });
+    const { invoice, payments } = await caller.invoices.get({ id });
+    expect(payments.map((p) => [p.paidOn, p.amount])).toEqual([
+      ['2026-02-01', 20],
+      ['2026-02-10', 50],
+      ['2026-02-10', 30],
+    ]);
+    expect(invoice.paidAmount).toBe(100);
+    expect(invoice.paidDate).toBe('2026-02-10');
+  });
+
+  it('three decimal payments add up exactly and lock the invoice', async () => {
+    const caller = await newUserCaller('jozef');
+    const { id } = await caller.invoices.create({
+      ...baseInvoice, items: [{ description: 'X', quantity: 1, unitPrice: 100, vatRate: 0 }],
+    });
+    for (const amount of [33.33, 33.33, 33.34]) await caller.invoices.addPayment({ id, amount });
+    const got = await caller.invoices.get({ id });
+    expect(got.invoice.paidAmount).toBe(100);
+    expect(got.lockReason).toBe('paid');
   });
 
   it('addPayment adds partial payments to the paid amount and keeps the latest date', async () => {
@@ -117,7 +135,6 @@ describe('invoices', () => {
     const { id } = await caller.invoices.create(baseInvoice); // total 290
     await caller.invoices.addPayment({ id, amount: 289 });
     await expect(caller.invoices.addPayment({ id, amount: 1.005 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    await expect(caller.invoices.markPaid({ id, paidAmount: 290.005 })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(289);
   });
 
@@ -130,16 +147,6 @@ describe('invoices', () => {
     ]);
     expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
     expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(200);
-  });
-
-  it('markPaid refuses an amount above the invoice total', async () => {
-    const caller = await newUserCaller('jozef');
-    const { id } = await caller.invoices.create(baseInvoice); // total 290
-    await expect(caller.invoices.markPaid({ id, paidAmount: 290.01 })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: `Úhrada presahuje sumu faktúry ${formatMoney(290)}.`,
-    });
-    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(0);
   });
 
   it('list filters by year, status, search and returns summary + years', async () => {
@@ -155,7 +162,7 @@ describe('invoices', () => {
       issueDate: '2025-03-01', dueDate: '2025-03-15', deliveryDate: '2025-03-01',
     }); // 2025
     const { id: paidId } = await caller.invoices.create({ ...baseInvoice, number: '20260003' });
-    await caller.invoices.markPaid({ id: paidId, paidAmount: 290, paidDate: '2026-02-01' });
+    await caller.invoices.addPayment({ id: paidId, amount: 290, paidDate: '2026-02-01' });
 
     const all2026 = await caller.invoices.list({ year: 2026 });
     expect(all2026.invoices).toHaveLength(3);
@@ -183,7 +190,7 @@ describe('invoices', () => {
       ...baseInvoice, number: '20260003', currency: 'CZK',
       items: [{ description: 'Y', quantity: 1, unitPrice: 500, vatRate: 0 }],
     });
-    await caller.invoices.markPaid({ id: paidId, paidAmount: 200, paidDate: '2026-02-01' });
+    await caller.invoices.addPayment({ id: paidId, amount: 200, paidDate: '2026-02-01' });
 
     const { summary } = await caller.invoices.list({});
     expect(summary.count).toBe(3);
@@ -201,13 +208,13 @@ describe('invoices', () => {
     await expect(caller.invoices.get({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('tenant isolation on get/update/markPaid/remove', async () => {
+  it('tenant isolation on get/update/addPayment/resetPayments/remove', async () => {
     const a = await newUserCaller('alice');
     const b = await newUserCaller('bob');
     const { id } = await a.invoices.create(baseInvoice);
     await expect(b.invoices.get({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(b.invoices.update({ id, data: baseInvoice })).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    await expect(b.invoices.markPaid({ id, paidAmount: 1 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(b.invoices.resetPayments({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(b.invoices.addPayment({ id, amount: 1 })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect((await a.invoices.get({ id })).invoice.paidAmount).toBe(0);
     await expect(b.invoices.remove({ id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -274,7 +281,7 @@ describe('locked invoices (imported from iDoklad)', () => {
     const { invoice } = await caller.invoices.get({ id });
     expect(invoice.paidAmount).toBe(190);
     expect(invoice.paidDate).toBe('2026-12-15');
-    await caller.invoices.markPaid({ id, paidAmount: 290, paidDate: '2026-12-20' });
+    await caller.invoices.addPayment({ id, amount: 100, paidDate: '2026-12-20' });
     expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(290);
   });
 
@@ -397,6 +404,7 @@ describe('paid invoices are locked', () => {
     await caller.invoices.resetPayments({ id });
     const got = await caller.invoices.get({ id });
     expect(got.invoice).toMatchObject({ paidAmount: 0, paidDate: null });
+    expect(got.payments).toEqual([]);
     expect(got).toMatchObject({ locked: false, lockReason: null });
     await caller.invoices.remove({ id });
   });
@@ -412,14 +420,5 @@ describe('paid invoices are locked', () => {
     await owner.invoices.resetPayments({ id });
     expect(await owner.invoices.get({ id })).toMatchObject({ locked: true, lockReason: 'idoklad' });
     expect((await owner.invoices.get({ id })).invoice.paidAmount).toBe(0);
-  });
-
-  it('markPaid can always set the paid amount to 0, even for a negative total', async () => {
-    const caller = await newUserCaller('jozef');
-    const { id } = await caller.invoices.create({
-      ...baseInvoice, items: [{ description: 'Dobropis', quantity: 1, unitPrice: -50, vatRate: 0 }],
-    });
-    await caller.invoices.markPaid({ id, paidAmount: 0 });
-    expect((await caller.invoices.get({ id })).invoice.paidAmount).toBe(0);
   });
 });

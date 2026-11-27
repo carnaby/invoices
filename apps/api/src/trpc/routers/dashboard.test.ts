@@ -20,9 +20,9 @@ describe('dashboard.stats', () => {
     const caller = createCaller(createTestContext(db, u.id));
     await caller.invoices.create(inv('20260001', '2026-01-10', '2026-01-24', 1000)); // overdue unpaid
     const { id } = await caller.invoices.create(inv('20260002', '2026-03-05', '2026-03-19', 500));
-    await caller.invoices.markPaid({ id, paidAmount: 500, paidDate: '2026-03-10' });
+    await caller.invoices.addPayment({ id, amount: 500, paidDate: '2026-03-10' });
     const { id: partId } = await caller.invoices.create(inv('20260003', '2026-03-20', '2099-12-31', 300));
-    await caller.invoices.markPaid({ id: partId, paidAmount: 100, paidDate: '2026-03-25' });
+    await caller.invoices.addPayment({ id: partId, amount: 100, paidDate: '2026-03-25' });
     await caller.invoices.create(inv('20250001', '2025-11-01', '2025-11-15', 700)); // other year
 
     const s = await caller.dashboard.stats({ year: 2026 });
@@ -60,7 +60,7 @@ describe('dashboard.stats', () => {
     const { id: czkId } = await caller.invoices.create({
       ...inv('20260003', '2026-02-15', '2026-03-01', 500), currency: 'CZK',
     });
-    await caller.invoices.markPaid({ id: czkId, paidAmount: 500, paidDate: '2026-02-20' });
+    await caller.invoices.addPayment({ id: czkId, amount: 500, paidDate: '2026-02-20' });
 
     const s = await caller.dashboard.stats({ year: 2026 });
     expect(s.byCurrency).toHaveLength(2);

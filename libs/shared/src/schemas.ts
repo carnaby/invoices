@@ -108,13 +108,6 @@ export const smtpPasswordSchema = z.object({
   password: z.string().min(1).max(500),
 });
 
-export const markPaidSchema = z.object({
-  id: z.string().uuid(),
-  paidAmount: z.number().min(0),
-  paidDate: dateStr.optional().nullable(),
-});
-export type MarkPaidInput = z.infer<typeof markPaidSchema>;
-
 /** One received payment; it is added to what the invoice already has paid. */
 export const addPaymentSchema = z.object({
   id: z.string().uuid(),

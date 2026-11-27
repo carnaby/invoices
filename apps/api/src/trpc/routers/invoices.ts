@@ -1,15 +1,15 @@
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { invoiceItems, invoices, settings } from '@invoices/db';
+import { invoiceItems, invoicePayments, invoices, settings } from '@invoices/db';
 import {
   addPaymentSchema, derivePaymentStatus, invoiceInputSchema, isOverdue,
-  markPaidSchema, round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
+  round2, sendEmailSchema, suggestInvoiceNumber, type InvoiceInput,
 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
 import {
-  checkAddedPayment, checkCurrencyChange, checkPaidAmount, checkStoredTotal, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
-  lockForEdit, todayIso,
+  checkAddedPayment, checkCurrencyChange, checkStoredTotal, invoiceNotFound, loadInvoiceWithItems, loadOriginal,
+  lockForEdit, lockInvoiceRow, paidAmountSql, todayIso,
 } from '../../invoices/invoices.service';
 import { sendMail, smtpConfigFromSettings } from '../../email/email.service';
 import { generateInvoicePdf } from '../../pdf/pdf.service';
@@ -109,6 +109,7 @@ export const invoicesRouter = router({
       const rows = await ctx.db
         .select({
           invoice: invoices,
+          paid: paidAmountSql,
           total: sql<string>`coalesce(sum(
             round(${invoiceItems.quantity} * ${invoiceItems.unitPrice}, 2)
             + round(round(${invoiceItems.quantity} * ${invoiceItems.unitPrice}, 2) * ${invoiceItems.vatRate} / 100, 2)
@@ -121,13 +122,14 @@ export const invoicesRouter = router({
         .orderBy(desc(invoices.number));
 
       const today = todayIso();
-      let list = rows.map(({ invoice, total }) => {
+      let list = rows.map(({ invoice, paid, total }) => {
         const t = Number(total);
-        const status = derivePaymentStatus(t, invoice.paidAmount);
+        const paidAmount = Number(paid);
+        const status = derivePaymentStatus(t, paidAmount);
         return {
           id: invoice.id, number: invoice.number, customerName: invoice.customerName,
           issueDate: invoice.issueDate, dueDate: invoice.dueDate, currency: invoice.currency,
-          paidAmount: invoice.paidAmount, sentAt: invoice.sentAt,
+          paidAmount, sentAt: invoice.sentAt,
           total: t, status, overdue: isOverdue(invoice.dueDate, status, today),
         };
       });
@@ -167,27 +169,10 @@ export const invoicesRouter = router({
   ),
 
   // Undoes mistyped payments; this also unlocks an invoice that was locked only because it was paid.
-  resetPayments: authedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
-    const [updated] = await ctx.db
-      .update(invoices)
-      .set({ paidAmount: 0, paidDate: null, updatedAt: new Date() })
-      .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)))
-      .returning({ id: invoices.id });
-    if (!updated) throw invoiceNotFound();
-    return { id: updated.id };
-  }),
-
-  markPaid: authedProcedure.input(markPaidSchema).mutation(({ ctx, input }) =>
+  resetPayments: authedProcedure.input(idInput).mutation(({ ctx, input }) =>
     ctx.db.transaction(async (tx) => {
-      await checkPaidAmount(tx, ctx.userId, input.id, input.paidAmount);
-      await tx
-        .update(invoices)
-        .set({
-          paidAmount: round2(input.paidAmount),
-          paidDate: input.paidDate ?? (input.paidAmount > 0 ? todayIso() : null),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
+      await lockInvoiceRow(tx, ctx.userId, input.id);
+      await tx.delete(invoicePayments).where(eq(invoicePayments.invoiceId, input.id));
       return { id: input.id };
     }),
   ),
@@ -196,14 +181,11 @@ export const invoicesRouter = router({
   addPayment: authedProcedure.input(addPaymentSchema).mutation(({ ctx, input }) =>
     ctx.db.transaction(async (tx) => {
       await checkAddedPayment(tx, ctx.userId, input.id, input.amount);
-      await tx
-        .update(invoices)
-        .set({
-          paidAmount: sql`${invoices.paidAmount} + ${round2(input.amount)}`,
-          paidDate: input.paidDate ?? todayIso(),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(invoices.id, input.id), eq(invoices.userId, ctx.userId)));
+      await tx.insert(invoicePayments).values({
+        invoiceId: input.id,
+        paidOn: input.paidDate ?? todayIso(),
+        amount: round2(input.amount),
+      });
       return { id: input.id };
     }),
   ),

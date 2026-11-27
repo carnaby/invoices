@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { invoiceItems, invoices } from '@invoices/db';
 import { derivePaymentStatus, isOverdue, round2 } from '@invoices/shared';
 import { authedProcedure, router } from '../trpc';
-import { todayIso } from '../../invoices/invoices.service';
+import { paidAmountSql, todayIso } from '../../invoices/invoices.service';
 
 const totalExpr = sql<string>`coalesce(sum(
   round(${invoiceItems.quantity} * ${invoiceItems.unitPrice}, 2)
@@ -20,14 +20,14 @@ export const dashboardRouter = router({
         .where(eq(invoices.userId, ctx.userId));
 
       const rowsQ = ctx.db
-        .select({ invoice: invoices, total: totalExpr })
+        .select({ invoice: invoices, paid: paidAmountSql, total: totalExpr })
         .from(invoices)
         .leftJoin(invoiceItems, eq(invoiceItems.invoiceId, invoices.id))
         .where(and(eq(invoices.userId, ctx.userId), sql`extract(year from ${invoices.issueDate}) = ${input.year}`))
         .groupBy(invoices.id);
 
       const recentQ = ctx.db
-        .select({ invoice: invoices, total: totalExpr })
+        .select({ invoice: invoices, paid: paidAmountSql, total: totalExpr })
         .from(invoices)
         .leftJoin(invoiceItems, eq(invoiceItems.invoiceId, invoices.id))
         .where(eq(invoices.userId, ctx.userId))
@@ -43,8 +43,9 @@ export const dashboardRouter = router({
         overdueTotal: number; overdueCount: number; monthly: number[];
       };
       const byCurrencyMap = new Map<string, Bucket>();
-      for (const { invoice, total } of rows) {
+      for (const { invoice, paid: paidSum, total } of rows) {
         const t = Number(total);
+        const paidAmount = Number(paidSum);
         const bucket = byCurrencyMap.get(invoice.currency) ?? {
           count: 0, invoicedTotal: 0, paidTotal: 0, unpaidTotal: 0,
           overdueTotal: 0, overdueCount: 0, monthly: Array(12).fill(0) as number[],
@@ -53,11 +54,11 @@ export const dashboardRouter = router({
         bucket.invoicedTotal = round2(bucket.invoicedTotal + t);
         const month = Number(invoice.issueDate.slice(5, 7)) - 1;
         bucket.monthly[month] = round2(bucket.monthly[month] + t);
-        const paid = Math.min(invoice.paidAmount, t);
+        const paid = Math.min(paidAmount, t);
         bucket.paidTotal = round2(bucket.paidTotal + paid);
-        const unpaid = round2(Math.max(0, t - invoice.paidAmount));
+        const unpaid = round2(Math.max(0, t - paidAmount));
         bucket.unpaidTotal = round2(bucket.unpaidTotal + unpaid);
-        const status = derivePaymentStatus(t, invoice.paidAmount);
+        const status = derivePaymentStatus(t, paidAmount);
         if (isOverdue(invoice.dueDate, status, today)) {
           bucket.overdueCount += 1;
           bucket.overdueTotal = round2(bucket.overdueTotal + unpaid);
@@ -72,13 +73,14 @@ export const dashboardRouter = router({
           overdueCount: b.overdueCount, monthly: b.monthly,
         }));
 
-      const recent = recentRows.map(({ invoice, total }) => {
+      const recent = recentRows.map(({ invoice, paid, total }) => {
         const t = Number(total);
-        const status = derivePaymentStatus(t, invoice.paidAmount);
+        const paidAmount = Number(paid);
+        const status = derivePaymentStatus(t, paidAmount);
         return {
           id: invoice.id, number: invoice.number, customerName: invoice.customerName,
           issueDate: invoice.issueDate, dueDate: invoice.dueDate, currency: invoice.currency,
-          paidAmount: invoice.paidAmount, sentAt: invoice.sentAt,
+          paidAmount, sentAt: invoice.sentAt,
           total: t, status, overdue: isOverdue(invoice.dueDate, status, today),
         };
       });

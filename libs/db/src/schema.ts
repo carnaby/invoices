@@ -1,7 +1,8 @@
 import {
   pgTable, uuid, text, timestamp, date, numeric, integer, boolean,
-  customType, uniqueIndex, index,
+  customType, uniqueIndex, index, check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
@@ -75,10 +76,8 @@ export const invoices = pgTable(
     introText: text('intro_text'),
     note: text('note'),
     currency: text('currency').notNull().default('EUR'),
-    paidAmount: numeric('paid_amount', { precision: 12, scale: 2, mode: 'number' })
-      .notNull()
-      .default(0),
-    paidDate: date('paid_date', { mode: 'string' }),
+    // paid_amount and paid_date stay in the database as a frozen record of the values before
+    // invoice_payments (migration 0003); nothing reads or writes them. A later migration drops them.
     sentAt: timestamp('sent_at', { withTimezone: true }),
     // Set for invoices imported from iDoklad: update and delete are refused (payments still allowed).
     lockedAt: timestamp('locked_at', { withTimezone: true }),
@@ -117,6 +116,24 @@ export const invoiceOriginals = pgTable('invoice_originals', {
   fileName: text('file_name').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One received payment. The paid amount and date of an invoice are always computed from these rows. */
+export const invoicePayments = pgTable(
+  'invoice_payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    invoiceId: uuid('invoice_id')
+      .notNull()
+      .references(() => invoices.id, { onDelete: 'cascade' }),
+    paidOn: date('paid_on', { mode: 'string' }).notNull(),
+    amount: numeric('amount', { precision: 12, scale: 2, mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('invoice_payments_invoice_idx').on(t.invoiceId),
+    check('invoice_payments_amount_positive', sql`${t.amount} > 0`),
+  ],
+);
 
 export const settings = pgTable('settings', {
   userId: uuid('user_id')
