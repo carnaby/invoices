@@ -27,6 +27,10 @@ test('list shows invoices with status filter and summary', async ({ page }) => {
   await expect(page.getByTestId(`invoice-row-${y}0002`)).toBeVisible();
   await expect(page.getByTestId('summary-count')).toContainText('2');
   await expect(page.getByTestId(`invoice-row-${y}0001`)).toContainText('Po splatnosti');
+  // Screen readers announce each invoice as a link that opens it.
+  await page.getByRole('link', { name: new RegExp(`${y}0002`) }).click();
+  await expect(page).toHaveURL(new RegExp('/invoices/[0-9a-f-]{36}$'));
+  await page.goBack();
 
   await page.getByTestId('status-filter').selectOption('overdue');
   await expect(page.getByTestId(`invoice-row-${y}0002`)).toBeHidden();
