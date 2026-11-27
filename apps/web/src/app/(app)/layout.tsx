@@ -14,6 +14,7 @@ import {
   SettingsIcon,
 } from '@/components/ui';
 import { trpc } from '@/lib/trpc';
+import { useLogout } from '@/lib/use-logout';
 
 type NavItem = { href: string; label: string; icon: ComponentType<{ size?: number }> };
 
@@ -48,13 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const me = trpc.auth.me.useQuery();
-  const utils = trpc.useUtils();
-  const logout = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.invalidate();
-      router.replace('/login');
-    },
-  });
+  const logout = useLogout();
 
   useEffect(() => {
     if (me.isSuccess && !me.isFetching && me.data === null) router.replace('/login');

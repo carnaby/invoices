@@ -1,10 +1,10 @@
 'use client';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { SettingsInput } from '@invoices/shared';
 import { changePasswordSchema } from '@invoices/shared';
 import { Button, Card, Field, Input, Textarea, CardTitle, LogoutIcon } from '@/components/ui';
 import { apiUrl, trpc } from '@/lib/trpc';
+import { useLogout } from '@/lib/use-logout';
 
 type SettingsData = SettingsInput & { hasSmtpPassword: boolean; hasSignature: boolean };
 
@@ -99,15 +99,8 @@ function SavedIndicator({ show }: { show: boolean }) {
 }
 
 function AccountCard() {
-  const router = useRouter();
-  const utils = trpc.useUtils();
   const me = trpc.auth.me.useQuery();
-  const logout = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.invalidate();
-      router.replace('/login');
-    },
-  });
+  const logout = useLogout();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
